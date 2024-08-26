@@ -21,7 +21,6 @@ import uuid
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
-from google.cloud import storage
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings, VertexAIEmbeddings
 from langchain_core.vectorstores import VectorStore
