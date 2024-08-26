@@ -359,10 +359,15 @@ class AlloyDBVectorStore(VectorStore):
         metadatas = [{"image_uri": uri} for uri in images]
 
         for uri in images:
-            encoded_image = self.encoded_image(uri)
+            encoded_image = self.encode_image(uri)
             encoded_images.append(encoded_image)
 
-        embeddings = self.embedding_service.embed_image(encoded_images)
+        if hasattr(self.embedding_service, "embed_image"):
+            embeddings = self.embedding_service.embed_image(images)
+        else:
+            raise ValueError(
+                "Please use an embedding model that supports image embedding."
+            )
 
         ids = await self._aadd_embeddings(
             encoded_images, embeddings, metadatas=metadatas, ids=ids, **kwargs
@@ -657,7 +662,7 @@ class AlloyDBVectorStore(VectorStore):
         self,
         query: Optional[str],
         image_uri: Optional[str],
-    ):
+    ) -> List[float]:
         if query and image_uri:
             raise ValueError(
                 f"`query` and `image_uri` cannot be specified at the same time."
@@ -665,7 +670,7 @@ class AlloyDBVectorStore(VectorStore):
         elif query:
             embedding = self.embedding_service.embed_query(text=query)
         elif image_uri:
-            embedding = self.embedding_service.embed_image([image_uri])
+            embedding = self.embedding_service.embed_image([image_uri])[0]
         else:
             raise ValueError(
                 f"Specify `query` or `image_uri` to perform similarity search."
