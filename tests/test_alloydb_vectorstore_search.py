@@ -203,19 +203,19 @@ class TestVectorStoreSearch:
     async def test_similarity_search_with_relevance_scores_threshold_cosine(self, vs):
         score_threshold = {"score_threshold": 0}
         results = await vs.asimilarity_search_with_relevance_scores(
-            "foo", **score_threshold
+            query="foo", image_uri=None, **score_threshold
         )
         assert len(results) == 4
 
         score_threshold = {"score_threshold": 0.02}
         results = await vs.asimilarity_search_with_relevance_scores(
-            "foo", **score_threshold
+            "foo", image_uri=None, **score_threshold
         )
         assert len(results) == 2
 
         score_threshold = {"score_threshold": 0.9}
         results = await vs.asimilarity_search_with_relevance_scores(
-            "foo", **score_threshold
+            "foo", image_uri=None, **score_threshold
         )
         assert len(results) == 1
         assert results[0][0] == Document(page_content="foo")
@@ -232,7 +232,7 @@ class TestVectorStoreSearch:
 
         score_threshold = {"score_threshold": 0.9}
         results = await vs.asimilarity_search_with_relevance_scores(
-            "foo", **score_threshold
+            query="foo", image_uri=None, **score_threshold
         )
         assert len(results) == 1
         assert results[0][0] == Document(page_content="foo")
@@ -250,7 +250,7 @@ class TestVectorStoreSearch:
         results = await vs.amax_marginal_relevance_search("bar")
         assert results[0] == Document(page_content="bar")
         results = await vs.amax_marginal_relevance_search(
-            "bar", filter="content = 'boo'"
+            query="bar", image_uri=None, filter="content = 'boo'"
         )
         assert results[0] == Document(page_content="boo")
 
@@ -275,7 +275,9 @@ class TestVectorStoreSearch:
         results = vs_custom.similarity_search("foo", k=1)
         assert len(results) == 1
         assert results == [Document(page_content="foo")]
-        results = vs_custom.similarity_search("foo", k=1, filter="mycontent = 'bar'")
+        results = vs_custom.similarity_search(
+            "foo", image_uri=None, k=1, filter="mycontent = 'bar'"
+        )
         assert results == [Document(page_content="bar")]
 
     def test_similarity_search_score(self, vs_custom):
