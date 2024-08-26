@@ -15,13 +15,15 @@
 # TODO: Remove below import when minimum supported Python version is 3.10
 from __future__ import annotations
 
+import base64
 import json
 import uuid
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
+from google.cloud import storage
 from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings
+from langchain_core.embeddings import Embeddings, VertexAIEmbeddings
 from langchain_core.vectorstores import VectorStore
 from sqlalchemy import RowMapping
 
@@ -341,6 +343,33 @@ class AlloyDBVectorStore(VectorStore):
         ids = await self.aadd_texts(texts, metadatas=metadatas, ids=ids, **kwargs)
         return ids
 
+    def encode_image(self, uri: str) -> str:
+        """Get base64 string from image URI."""
+        with open(uri, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode("utf-8")
+
+    async def aadd_images(
+        self,
+        images: List[str],
+        metadatas: Optional[List[dict]] = None,
+        ids: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> List[str]:
+        """Embed images and add to the table."""
+        encoded_images = []
+        metadatas = [{"image_uri": uri} for uri in images]
+
+        for uri in images:
+            encoded_image = self.encoded_image(uri)
+            encoded_images.append(encoded_image)
+
+        embeddings = self.embedding_service.embed_image(encoded_images)
+
+        ids = await self._aadd_embeddings(
+            encoded_images, embeddings, metadatas=metadatas, ids=ids, **kwargs
+        )
+        return ids
+
     def add_texts(
         self,
         texts: Iterable[str],
@@ -361,6 +390,18 @@ class AlloyDBVectorStore(VectorStore):
     ) -> List[str]:
         """Embed documents and add to the table."""
         return self.engine._run_as_sync(self.aadd_documents(documents, ids, **kwargs))
+
+    def add_images(
+        self,
+        images: List[str],
+        metadatas: Optional[List[dict]] = None,
+        ids: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> List[str]:
+        """Embed images and add to the table."""
+        return self.engine._run_as_sync(
+            self.aadd_images(images, metadatas, ids, **kwargs)
+        )
 
     async def adelete(
         self,
@@ -613,28 +654,48 @@ class AlloyDBVectorStore(VectorStore):
             results = await self.engine._afetch(stmt)
         return results
 
+    def embedding_helper(
+        self,
+        query: Optional[str],
+        image_uri: Optional[str],
+    ):
+        if query and image_uri:
+            raise ValueError(
+                f"`query` and `image_uri` cannot be specified at the same time."
+            )
+        elif query:
+            embedding = self.embedding_service.embed_query(text=query)
+        elif image_uri:
+            embedding = self.embedding_service.embed_image([image_uri])
+        else:
+            raise ValueError(
+                f"Specify `query` or `image_uri` to perform similarity search."
+            )
+        return embedding
+
     def similarity_search(
         self,
-        query: str,
+        query: Optional[str],
+        image_uri: Optional[str],
         k: Optional[int] = None,
         filter: Optional[str] = None,
         **kwargs: Any,
     ) -> List[Document]:
         """Return docs selected by similarity search on query."""
         return self.engine._run_as_sync(
-            self.asimilarity_search(query, k=k, filter=filter, **kwargs)
+            self.asimilarity_search(query, image_uri, k=k, filter=filter, **kwargs)
         )
 
     async def asimilarity_search(
         self,
-        query: str,
+        query: Optional[str],
+        image_uri: Optional[str],
         k: Optional[int] = None,
         filter: Optional[str] = None,
         **kwargs: Any,
     ) -> List[Document]:
         """Return docs selected by similarity search on query."""
-        embedding = self.embedding_service.embed_query(text=query)
-
+        embedding = self.embedding_helper(query, image_uri)
         return await self.asimilarity_search_by_vector(
             embedding=embedding, k=k, filter=filter, **kwargs
         )
@@ -652,13 +713,14 @@ class AlloyDBVectorStore(VectorStore):
 
     async def asimilarity_search_with_score(
         self,
-        query: str,
+        query: Optional[str],
+        image_uri: Optional[str],
         k: Optional[int] = None,
         filter: Optional[str] = None,
         **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         """Return docs and distance scores selected by similarity search on query."""
-        embedding = self.embedding_service.embed_query(query)
+        embedding = self.embedding_helper(query, image_uri)
         docs = await self.asimilarity_search_with_score_by_vector(
             embedding=embedding, k=k, filter=filter, **kwargs
         )
@@ -713,7 +775,8 @@ class AlloyDBVectorStore(VectorStore):
 
     async def amax_marginal_relevance_search(
         self,
-        query: str,
+        query: Optional[str],
+        image_uri: Optional[str],
         k: Optional[int] = None,
         fetch_k: Optional[int] = None,
         lambda_mult: Optional[float] = None,
@@ -721,7 +784,7 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[Document]:
         """Return docs selected using the maximal marginal relevance."""
-        embedding = self.embedding_service.embed_query(text=query)
+        embedding = self.embedding_helper(query, image_uri)
 
         return await self.amax_marginal_relevance_search_by_vector(
             embedding=embedding,
@@ -803,13 +866,16 @@ class AlloyDBVectorStore(VectorStore):
 
     def similarity_search_with_score(
         self,
-        query: str,
+        query: Optional[str],
+        image_uri: Optional[str],
         k: Optional[int] = None,
         filter: Optional[str] = None,
         **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         """Return docs and distance scores selected by similarity search on query."""
-        coro = self.asimilarity_search_with_score(query, k, filter=filter, **kwargs)
+        coro = self.asimilarity_search_with_score(
+            query, image_uri, k, filter=filter, **kwargs
+        )
         return self.engine._run_as_sync(coro)
 
     def similarity_search_by_vector(
@@ -838,7 +904,8 @@ class AlloyDBVectorStore(VectorStore):
 
     def max_marginal_relevance_search(
         self,
-        query: str,
+        query: Optional[str],
+        image_uri: Optional[str],
         k: Optional[int] = None,
         fetch_k: Optional[int] = None,
         lambda_mult: Optional[float] = None,
@@ -848,6 +915,7 @@ class AlloyDBVectorStore(VectorStore):
         """Return docs selected using the maximal marginal relevance."""
         coro = self.amax_marginal_relevance_search(
             query,
+            image_uri,
             k,
             filter=filter,
             fetch_k=fetch_k,
