@@ -22,7 +22,7 @@ from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Typ
 
 import numpy as np
 from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings, VertexAIEmbeddings
+from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
 from sqlalchemy import RowMapping
 
