@@ -109,6 +109,8 @@ class AlloyDBEngine:
     """A class for managing connections to a AlloyDB database."""
 
     _connector: Optional[AsyncConnector] = None
+    _default_loop: Optional[asyncio.AbstractEventLoop] = None
+    _default_thread: Optional[Thread] = None
     __create_key = object()
 
     def __init__(
@@ -169,9 +171,12 @@ class AlloyDBEngine:
         """
         # Running a loop in a background thread allows us to support
         # async methods from non-async environments
-        loop = asyncio.new_event_loop()
-        thread = Thread(target=loop.run_forever, daemon=True)
-        thread.start()
+        if cls._default_loop is None:
+            cls._default_loop = asyncio.new_event_loop()
+            cls._default_thread = Thread(
+                target=cls._default_loop.run_forever, daemon=True
+            )
+            cls._default_thread.start()
         coro = cls._create(
             project_id,
             region,
@@ -181,11 +186,11 @@ class AlloyDBEngine:
             ip_type,
             user,
             password,
-            loop=loop,
-            thread=thread,
+            loop=cls._default_loop,
+            thread=cls._default_thread,
             iam_account_email=iam_account_email,
         )
-        return asyncio.run_coroutine_threadsafe(coro, loop).result()
+        return asyncio.run_coroutine_threadsafe(coro, cls._default_loop).result()
 
     @classmethod
     async def _create(

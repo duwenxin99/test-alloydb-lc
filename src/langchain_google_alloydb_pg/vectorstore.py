@@ -23,7 +23,11 @@ import numpy as np
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
-from sqlalchemy import RowMapping
+from langchain_core.vectorstores.utils import (
+    _maximal_marginal_relevance as maximal_marginal_relevance,
+)
+from sqlalchemy import RowMapping, text
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from .engine import AlloyDBEngine
 from .indexes import (
@@ -37,7 +41,7 @@ from .indexes import (
 )
 
 
-class AlloyDBVectorStore(VectorStore):
+class AsyncAlloyDBVectorStore(VectorStore):
     """Google AlloyDB Vector Store class"""
 
     __create_key = object()
@@ -45,7 +49,7 @@ class AlloyDBVectorStore(VectorStore):
     def __init__(
         self,
         key: object,
-        engine: AlloyDBEngine,
+        engine: AsyncEngine,
         embedding_service: Embeddings,
         table_name: str,
         content_column: str = "content",
@@ -59,7 +63,7 @@ class AlloyDBVectorStore(VectorStore):
         lambda_mult: float = 0.5,
         index_query_options: Optional[QueryOptions] = None,
     ):
-        """AlloyDBVectorStore constructor.
+        """AsyncAlloyDBVectorStore constructor.
         Args:
             key (object): Prevent direct constructor usage.
             engine (AlloyDBEngine): Connection pool engine for managing connections to AlloyDB database.
@@ -68,7 +72,6 @@ class AlloyDBVectorStore(VectorStore):
             content_column (str): Column that represent a Document’s page_content. Defaults to "content".
             embedding_column (str): Column for embedding vectors. The embedding is generated from the document value. Defaults to "embedding".
             metadata_columns (List[str]): Column(s) that represent a document's metadata.
-            ignore_metadata_columns (List[str]): Column(s) to ignore in pre-existing tables for a document's metadata. Can not be used with metadata_columns. Defaults to None.
             id_column (str): Column that represents the Document's id. Defaults to "langchain_id".
             metadata_json_column (str): Column to store metadata as JSON. Defaults to "langchain_metadata".
             distance_strategy (DistanceStrategy): Distance strategy to use for vector similarity search. Defaults to COSINE_DISTANCE.
@@ -81,7 +84,7 @@ class AlloyDBVectorStore(VectorStore):
         Raises:
             Exception: If called directly by user.
         """
-        if key != AlloyDBVectorStore.__create_key:
+        if key != AsyncAlloyDBVectorStore.__create_key:
             raise Exception(
                 "Only create class through 'create' or 'create_sync' methods!"
             )
@@ -102,7 +105,7 @@ class AlloyDBVectorStore(VectorStore):
 
     @classmethod
     async def create(
-        cls: Type[AlloyDBVectorStore],
+        cls: Type[AsyncAlloyDBVectorStore],
         engine: AlloyDBEngine,
         embedding_service: Embeddings,
         table_name: str,
@@ -117,8 +120,8 @@ class AlloyDBVectorStore(VectorStore):
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
         index_query_options: Optional[QueryOptions] = None,
-    ) -> AlloyDBVectorStore:
-        """Create an AlloyDBVectorStore instance.
+    ) -> AsyncAlloyDBVectorStore:
+        """Create an AsyncAlloyDBVectorStore instance.
 
         Args:
             engine (AlloyDBEngine): Connection pool engine for managing connections to AlloyDB database.
@@ -137,7 +140,7 @@ class AlloyDBVectorStore(VectorStore):
             index_query_options (QueryOptions): Index query option.
 
         Returns:
-            AlloyDBVectorStore
+            AsyncAlloyDBVectorStore
         """
         if metadata_columns and ignore_metadata_columns:
             raise ValueError(
@@ -145,7 +148,10 @@ class AlloyDBVectorStore(VectorStore):
             )
         # Get field type information
         stmt = f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table_name}'"
-        results = await engine._afetch(stmt)
+        async with engine.connect() as conn:
+            result = await conn.execute(text(stmt))
+            result_map = result.mappings()
+            results = result_map.fetchall()
         columns = {}
         for field in results:
             columns[field["column_name"]] = field["data_type"]
@@ -189,7 +195,7 @@ class AlloyDBVectorStore(VectorStore):
 
         return cls(
             cls.__create_key,
-            engine,
+            engine._engine,
             embedding_service,
             table_name,
             content_column,
@@ -203,70 +209,12 @@ class AlloyDBVectorStore(VectorStore):
             lambda_mult,
             index_query_options,
         )
-
-    @classmethod
-    def create_sync(
-        cls,
-        engine: AlloyDBEngine,
-        embedding_service: Embeddings,
-        table_name: str,
-        content_column: str = "content",
-        embedding_column: str = "embedding",
-        metadata_columns: List[str] = [],
-        ignore_metadata_columns: Optional[List[str]] = None,
-        id_column: str = "langchain_id",
-        metadata_json_column: str = "langchain_metadata",
-        distance_strategy: DistanceStrategy = DEFAULT_DISTANCE_STRATEGY,
-        k: int = 4,
-        fetch_k: int = 20,
-        lambda_mult: float = 0.5,
-        index_query_options: Optional[QueryOptions] = None,
-    ) -> AlloyDBVectorStore:
-        """Create an AlloyDBVectorStore instance.
-
-        Args:
-            key (object): Prevent direct constructor usage.
-            engine (AlloyDBEngine): Connection pool engine for managing connections to AlloyDB database.
-            embedding_service (Embeddings): Text embedding model to use.
-            table_name (str): Name of an existing table.
-            content_column (str): Column that represent a Document’s page_content. Defaults to "content".
-            embedding_column (str): Column for embedding vectors. The embedding is generated from the document value. Defaults to "embedding".
-            metadata_columns (List[str]): Column(s) that represent a document's metadata.
-            ignore_metadata_columns (List[str]): Column(s) to ignore in pre-existing tables for a document's metadata. Can not be used with metadata_columns. Defaults to None.
-            id_column (str): Column that represents the Document's id. Defaults to "langchain_id".
-            metadata_json_column (str): Column to store metadata as JSON. Defaults to "langchain_metadata".
-            distance_strategy (DistanceStrategy): Distance strategy to use for vector similarity search. Defaults to COSINE_DISTANCE.
-            k (int): Number of Documents to return from search. Defaults to 4.
-            fetch_k (int): Number of Documents to fetch to pass to MMR algorithm.
-            lambda_mult (float): Number between 0 and 1 that determines the degree of diversity among the results with 0 corresponding to maximum diversity and 1 to minimum diversity. Defaults to 0.5.
-            index_query_options (QueryOptions): Index query option.
-
-        Returns:
-            AlloyDBVectorStore
-        """
-        coro = cls.create(
-            engine,
-            embedding_service,
-            table_name,
-            content_column,
-            embedding_column,
-            metadata_columns,
-            ignore_metadata_columns,
-            id_column,
-            metadata_json_column,
-            distance_strategy,
-            k,
-            fetch_k,
-            lambda_mult,
-            index_query_options,
-        )
-        return engine._run_as_sync(coro)
 
     @property
     def embeddings(self) -> Embeddings:
         return self.embedding_service
 
-    async def _aadd_embeddings(
+    async def __aadd_embeddings(
         self,
         texts: Iterable[str],
         embeddings: List[List[float]],
@@ -311,7 +259,9 @@ class AlloyDBVectorStore(VectorStore):
                 values_stmt += ")"
 
             query = insert_stmt + values_stmt
-            await self.engine._aexecute(query, values)
+            async with self.engine.connect() as conn:
+                await conn.execute(text(query), values)
+                await conn.commit()
 
         return ids
 
@@ -324,7 +274,7 @@ class AlloyDBVectorStore(VectorStore):
     ) -> List[str]:
         """Embed texts and add to the table."""
         embeddings = self.embedding_service.embed_documents(list(texts))
-        ids = await self._aadd_embeddings(
+        ids = await self.__aadd_embeddings(
             texts, embeddings, metadatas=metadatas, ids=ids, **kwargs
         )
         return ids
@@ -341,27 +291,6 @@ class AlloyDBVectorStore(VectorStore):
         ids = await self.aadd_texts(texts, metadatas=metadatas, ids=ids, **kwargs)
         return ids
 
-    def add_texts(
-        self,
-        texts: Iterable[str],
-        metadatas: Optional[List[dict]] = None,
-        ids: Optional[List[str]] = None,
-        **kwargs: Any,
-    ) -> List[str]:
-        """Embed texts and add to the table."""
-        return self.engine._run_as_sync(
-            self.aadd_texts(texts, metadatas, ids, **kwargs)
-        )
-
-    def add_documents(
-        self,
-        documents: List[Document],
-        ids: Optional[List[str]] = None,
-        **kwargs: Any,
-    ) -> List[str]:
-        """Embed documents and add to the table."""
-        return self.engine._run_as_sync(self.aadd_documents(documents, ids, **kwargs))
-
     async def adelete(
         self,
         ids: Optional[List[str]] = None,
@@ -373,20 +302,14 @@ class AlloyDBVectorStore(VectorStore):
 
         id_list = ", ".join([f"'{id}'" for id in ids])
         query = f'DELETE FROM "{self.table_name}" WHERE {self.id_column} in ({id_list})'
-        await self.engine._aexecute(query)
+        async with self.engine.connect() as conn:
+            await conn.execute(text(query))
+            await conn.commit()
         return True
-
-    def delete(
-        self,
-        ids: Optional[List[str]] = None,
-        **kwargs: Any,
-    ) -> Optional[bool]:
-        """Delete records from the table."""
-        return self.engine._run_as_sync(self.adelete(ids, **kwargs))
 
     @classmethod
     async def afrom_texts(  # type: ignore[override]
-        cls: Type[AlloyDBVectorStore],
+        cls: Type[AsyncAlloyDBVectorStore],
         texts: List[str],
         embedding: Embeddings,
         engine: AlloyDBEngine,
@@ -400,8 +323,8 @@ class AlloyDBVectorStore(VectorStore):
         id_column: str = "langchain_id",
         metadata_json_column: str = "langchain_metadata",
         **kwargs: Any,
-    ) -> AlloyDBVectorStore:
-        """Create an AlloyDBVectorStore instance from texts.
+    ) -> AsyncAlloyDBVectorStore:
+        """Create an AsyncAlloyDBVectorStore instance from texts.
 
         Args:
             texts (List[str]): Texts to add to the vector store.
@@ -418,7 +341,7 @@ class AlloyDBVectorStore(VectorStore):
             metadata_json_column (str): Column to store metadata as JSON. Defaults to "langchain_metadata".
 
         Returns:
-            AlloyDBVectorStore
+            AsyncAlloyDBVectorStore
         """
         vs = await cls.create(
             engine,
@@ -436,7 +359,7 @@ class AlloyDBVectorStore(VectorStore):
 
     @classmethod
     async def afrom_documents(  # type: ignore[override]
-        cls: Type[AlloyDBVectorStore],
+        cls: Type[AsyncAlloyDBVectorStore],
         documents: List[Document],
         embedding: Embeddings,
         engine: AlloyDBEngine,
@@ -449,8 +372,8 @@ class AlloyDBVectorStore(VectorStore):
         id_column: str = "langchain_id",
         metadata_json_column: str = "langchain_metadata",
         **kwargs: Any,
-    ) -> AlloyDBVectorStore:
-        """Create an AlloyDBVectorStore instance from documents.
+    ) -> AsyncAlloyDBVectorStore:
+        """Create an AsyncAlloyDBVectorStore instance from documents.
 
         Args:
             documents (List[Document]): Documents to add to the vector store.
@@ -467,7 +390,7 @@ class AlloyDBVectorStore(VectorStore):
             metadata_json_column (str): Column to store metadata as JSON. Defaults to "langchain_metadata".
 
         Returns:
-            AlloyDBVectorStore
+            AsyncAlloyDBVectorStore
         """
 
         vs = await cls.create(
@@ -486,110 +409,6 @@ class AlloyDBVectorStore(VectorStore):
         await vs.aadd_texts(texts, metadatas=metadatas, ids=ids, **kwargs)
         return vs
 
-    @classmethod
-    def from_texts(  # type: ignore[override]
-        cls: Type[AlloyDBVectorStore],
-        texts: List[str],
-        embedding: Embeddings,
-        engine: AlloyDBEngine,
-        table_name: str,
-        metadatas: Optional[List[dict]] = None,
-        ids: Optional[List[str]] = None,
-        content_column: str = "content",
-        embedding_column: str = "embedding",
-        metadata_columns: List[str] = [],
-        ignore_metadata_columns: Optional[List[str]] = None,
-        id_column: str = "langchain_id",
-        metadata_json_column: str = "langchain_metadata",
-        **kwargs: Any,
-    ) -> AlloyDBVectorStore:
-        """Create an AlloyDBVectorStore instance from texts.
-
-        Args:
-            texts (List[str]): Texts to add to the vector store.
-            embedding (Embeddings): Text embedding model to use.
-            engine (AlloyDBEngine): Connection pool engine for managing connections to AlloyDB database.
-            table_name (str): Name of an existing table.
-            metadatas (Optional[List[dict]]): List of metadatas to add to table records.
-            ids: (Optional[List[str]]): List of IDs to add to table records.
-            content_column (str): Column that represent a Document’s page_content. Defaults to "content".
-            embedding_column (str): Column for embedding vectors. The embedding is generated from the document value. Defaults to "embedding".
-            metadata_columns (List[str]): Column(s) that represent a document's metadata.
-            ignore_metadata_columns (List[str]): Column(s) to ignore in pre-existing tables for a document's metadata. Can not be used with metadata_columns. Defaults to None.
-            id_column (str): Column that represents the Document's id. Defaults to "langchain_id".
-            metadata_json_column (str): Column to store metadata as JSON. Defaults to "langchain_metadata".
-
-        Returns:
-            AlloyDBVectorStore
-        """
-        coro = cls.afrom_texts(
-            texts,
-            embedding,
-            engine,
-            table_name,
-            metadatas=metadatas,
-            content_column=content_column,
-            embedding_column=embedding_column,
-            metadata_columns=metadata_columns,
-            ignore_metadata_columns=ignore_metadata_columns,
-            metadata_json_column=metadata_json_column,
-            id_column=id_column,
-            ids=ids,
-            **kwargs,
-        )
-        return engine._run_as_sync(coro)
-
-    @classmethod
-    def from_documents(  # type: ignore[override]
-        cls: Type[AlloyDBVectorStore],
-        documents: List[Document],
-        embedding: Embeddings,
-        engine: AlloyDBEngine,
-        table_name: str,
-        ids: Optional[List[str]] = None,
-        content_column: str = "content",
-        embedding_column: str = "embedding",
-        metadata_columns: List[str] = [],
-        ignore_metadata_columns: Optional[List[str]] = None,
-        id_column: str = "langchain_id",
-        metadata_json_column: str = "langchain_metadata",
-        **kwargs: Any,
-    ) -> AlloyDBVectorStore:
-        """Create an AlloyDBVectorStore instance from documents.
-
-        Args:
-            documents (List[Document]): Documents to add to the vector store.
-            embedding (Embeddings): Text embedding model to use.
-            engine (AlloyDBEngine): Connection pool engine for managing connections to AlloyDB database.
-            table_name (str): Name of an existing table.
-            metadatas (Optional[List[dict]]): List of metadatas to add to table records.
-            ids: (Optional[List[str]]): List of IDs to add to table records.
-            content_column (str): Column that represent a Document’s page_content. Defaults to "content".
-            embedding_column (str): Column for embedding vectors. The embedding is generated from the document value. Defaults to "embedding".
-            metadata_columns (List[str]): Column(s) that represent a document's metadata.
-            ignore_metadata_columns (List[str]): Column(s) to ignore in pre-existing tables for a document's metadata. Can not be used with metadata_columns. Defaults to None.
-            id_column (str): Column that represents the Document's id. Defaults to "langchain_id".
-            metadata_json_column (str): Column to store metadata as JSON. Defaults to "langchain_metadata".
-
-        Returns:
-            AlloyDBVectorStore
-        """
-        coro = cls.afrom_documents(
-            documents,
-            embedding,
-            engine,
-            table_name,
-            content_column=content_column,
-            embedding_column=embedding_column,
-            metadata_columns=metadata_columns,
-            ignore_metadata_columns=ignore_metadata_columns,
-            metadata_json_column=metadata_json_column,
-            id_column=id_column,
-            ids=ids,
-            **kwargs,
-        )
-        return engine._run_as_sync(coro)
-
     async def __query_collection(
         self,
         embedding: List[float],
@@ -606,24 +425,17 @@ class AlloyDBVectorStore(VectorStore):
         stmt = f"SELECT *, {search_function}({self.embedding_column}, '{embedding}') as distance FROM \"{self.table_name}\" {filter} ORDER BY {self.embedding_column} {operator} '{embedding}' LIMIT {k};"
         if self.index_query_options:
             query_options_stmt = f"SET LOCAL {self.index_query_options.to_string()};"
-            results = await self.engine._afetch_with_query_options(
-                stmt, query_options_stmt
-            )
+            async with self.engine.connect() as conn:
+                await conn.execute(text(query_options_stmt))
+                result = await conn.execute(text(stmt))
+                result_map = result.mappings()
+                results = result_map.fetchall()
         else:
-            results = await self.engine._afetch(stmt)
+            async with self.engine.connect() as conn:
+                result = await conn.execute(text(stmt))
+                result_map = result.mappings()
+                results = result_map.fetchall()
         return results
-
-    def similarity_search(
-        self,
-        query: str,
-        k: Optional[int] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any,
-    ) -> List[Document]:
-        """Return docs selected by similarity search on query."""
-        return self.engine._run_as_sync(
-            self.asimilarity_search(query, k=k, filter=filter, **kwargs)
-        )
 
     async def asimilarity_search(
         self,
@@ -801,101 +613,6 @@ class AlloyDBVectorStore(VectorStore):
 
         return [r for i, r in enumerate(documents_with_scores) if i in mmr_selected]
 
-    def similarity_search_with_score(
-        self,
-        query: str,
-        k: Optional[int] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any,
-    ) -> List[Tuple[Document, float]]:
-        """Return docs and distance scores selected by similarity search on query."""
-        coro = self.asimilarity_search_with_score(query, k, filter=filter, **kwargs)
-        return self.engine._run_as_sync(coro)
-
-    def similarity_search_by_vector(
-        self,
-        embedding: List[float],
-        k: Optional[int] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any,
-    ) -> List[Document]:
-        """Return docs selected by vector similarity search."""
-        coro = self.asimilarity_search_by_vector(embedding, k, filter=filter, **kwargs)
-        return self.engine._run_as_sync(coro)
-
-    def similarity_search_with_score_by_vector(
-        self,
-        embedding: List[float],
-        k: Optional[int] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any,
-    ) -> List[Tuple[Document, float]]:
-        """Return docs and distance scores selected by vector similarity search."""
-        coro = self.asimilarity_search_with_score_by_vector(
-            embedding, k, filter=filter, **kwargs
-        )
-        return self.engine._run_as_sync(coro)
-
-    def max_marginal_relevance_search(
-        self,
-        query: str,
-        k: Optional[int] = None,
-        fetch_k: Optional[int] = None,
-        lambda_mult: Optional[float] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any,
-    ) -> List[Document]:
-        """Return docs selected using the maximal marginal relevance."""
-        coro = self.amax_marginal_relevance_search(
-            query,
-            k,
-            filter=filter,
-            fetch_k=fetch_k,
-            lambda_mult=lambda_mult,
-            **kwargs,
-        )
-        return self.engine._run_as_sync(coro)
-
-    def max_marginal_relevance_search_by_vector(
-        self,
-        embedding: List[float],
-        k: Optional[int] = None,
-        fetch_k: Optional[int] = None,
-        lambda_mult: Optional[float] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any,
-    ) -> List[Document]:
-        """Return docs selected using the maximal marginal relevance."""
-        coro = self.amax_marginal_relevance_search_by_vector(
-            embedding,
-            k,
-            filter=filter,
-            fetch_k=fetch_k,
-            lambda_mult=lambda_mult,
-            **kwargs,
-        )
-        return self.engine._run_as_sync(coro)
-
-    def max_marginal_relevance_search_with_score_by_vector(
-        self,
-        embedding: List[float],
-        k: Optional[int] = None,
-        fetch_k: Optional[int] = None,
-        lambda_mult: Optional[float] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any,
-    ) -> List[Tuple[Document, float]]:
-        """Return docs and distance scores selected using the maximal marginal relevance."""
-        coro = self.amax_marginal_relevance_search_with_score_by_vector(
-            embedding,
-            k,
-            filter=filter,
-            fetch_k=fetch_k,
-            lambda_mult=lambda_mult,
-            **kwargs,
-        )
-        return self.engine._run_as_sync(coro)
-
     async def set_maintenance_work_mem(self, num_leaves: int, vector_size: int) -> None:
         """Set database maintenance work memory (for ScaNN index creation)."""
         # Required index memory in MB
@@ -903,9 +620,10 @@ class AlloyDBVectorStore(VectorStore):
         index_memory_required = (
             round(50 * num_leaves * vector_size * 4 / 1024 / 1024) + buffer
         )  # Convert bytes to MB
-        await self.engine._aexecute(
-            f"SET maintenance_work_mem TO '{index_memory_required} MB';"
-        )
+        query = f"SET maintenance_work_mem TO '{index_memory_required} MB';"
+        async with self.engine.connect() as conn:
+            await conn.execute(text(query))
+            await conn.commit()
 
     async def aapply_vector_index(
         self,
@@ -920,7 +638,9 @@ class AlloyDBVectorStore(VectorStore):
 
         # Create `postgres_ann` extension when a `ScaNN` index is applied
         if isinstance(index, ScaNNIndex):
-            await self.engine._aexecute("CREATE EXTENSION IF NOT EXISTS postgres_ann")
+            async with self.engine.connect() as conn:
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgres_ann"))
+                await conn.commit()
             function = index.distance_strategy.scann_index_function
         else:
             function = index.distance_strategy.index_function
@@ -933,15 +653,21 @@ class AlloyDBVectorStore(VectorStore):
             name = index.name
         stmt = f"CREATE INDEX {'CONCURRENTLY' if concurrently else ''} {name} ON \"{self.table_name}\" USING {index.index_type} ({self.embedding_column} {function}) {params} {filter};"
         if concurrently:
-            await self.engine._aexecute_outside_tx(stmt)
+            async with self.engine.connect() as conn:
+                await conn.execute(text("COMMIT"))
+                await conn.execute(text(stmt))
         else:
-            await self.engine._aexecute(stmt)
+            async with self.engine.connect() as conn:
+                await conn.execute(text(stmt))
+                await conn.commit()
 
     async def areindex(self, index_name: Optional[str] = None) -> None:
         """Re-index the vector store table."""
         index_name = index_name or self.table_name + DEFAULT_INDEX_NAME_SUFFIX
         query = f"REINDEX INDEX {index_name};"
-        await self.engine._aexecute(query)
+        async with self.engine.connect() as conn:
+            await conn.execute(text(query))
+            await conn.commit()
 
     async def adrop_vector_index(
         self,
@@ -950,9 +676,11 @@ class AlloyDBVectorStore(VectorStore):
         """Drop the vector index."""
         index_name = index_name or self.table_name + DEFAULT_INDEX_NAME_SUFFIX
         query = f"DROP INDEX IF EXISTS {index_name};"
-        await self.engine._aexecute(query)
+        async with self.engine.connect() as conn:
+            await conn.execute(text(query))
+            await conn.commit()
 
-    async def is_valid_index(
+    async def ais_valid_index(
         self,
         index_name: Optional[str] = None,
     ) -> bool:
@@ -963,78 +691,8 @@ class AlloyDBVectorStore(VectorStore):
         FROM pg_indexes
         WHERE tablename = '{self.table_name}' AND indexname = '{index_name}';
         """
-        results = await self.engine._afetch(query)
+        async with self.engine.connect() as conn:
+            result = await conn.execute(text(query))
+            result_map = result.mappings()
+            results = result_map.fetchall()
         return bool(len(results) == 1)
-
-
-### The following is copied from langchain-community until it's moved into core
-
-Matrix = Union[List[List[float]], List[np.ndarray], np.ndarray]
-
-
-def maximal_marginal_relevance(
-    query_embedding: np.ndarray,
-    embedding_list: list,
-    lambda_mult: float = 0.5,
-    k: int = 4,
-) -> List[int]:
-    """Calculate maximal marginal relevance."""
-    if min(k, len(embedding_list)) <= 0:
-        return []
-    if query_embedding.ndim == 1:
-        query_embedding = np.expand_dims(query_embedding, axis=0)
-    similarity_to_query = cosine_similarity(query_embedding, embedding_list)[0]
-    most_similar = int(np.argmax(similarity_to_query))
-    idxs = [most_similar]
-    selected = np.array([embedding_list[most_similar]])
-    while len(idxs) < min(k, len(embedding_list)):
-        best_score = -np.inf
-        idx_to_add = -1
-        similarity_to_selected = cosine_similarity(embedding_list, selected)
-        for i, query_score in enumerate(similarity_to_query):
-            if i in idxs:
-                continue
-            redundant_score = max(similarity_to_selected[i])
-            equation_score = (
-                lambda_mult * query_score - (1 - lambda_mult) * redundant_score
-            )
-            if equation_score > best_score:
-                best_score = equation_score
-                idx_to_add = i
-        idxs.append(idx_to_add)
-        selected = np.append(selected, [embedding_list[idx_to_add]], axis=0)
-    return idxs
-
-
-def cosine_similarity(X: Matrix, Y: Matrix) -> np.ndarray:
-    """Row-wise cosine similarity between two equal-width matrices."""
-    if len(X) == 0 or len(Y) == 0:
-        return np.array([])
-
-    X = np.array(X)
-    Y = np.array(Y)
-    if X.shape[1] != Y.shape[1]:
-        raise ValueError(
-            f"Number of columns in X and Y must be the same. X has shape {X.shape} "
-            f"and Y has shape {Y.shape}."
-        )
-    try:
-        import simsimd as simd  # type: ignore
-
-        X = np.array(X, dtype=np.float32)
-        Y = np.array(Y, dtype=np.float32)
-        Z = 1 - simd.cdist(X, Y, metric="cosine")
-        if isinstance(Z, float):
-            return np.array([Z])
-        return Z
-    except ImportError:
-        X_norm = np.linalg.norm(X, axis=1)
-        Y_norm = np.linalg.norm(Y, axis=1)
-        # Ignore divide by zero errors run time warnings as those are handled below.
-        with np.errstate(divide="ignore", invalid="ignore"):
-            similarity = np.dot(X, Y.T) / np.outer(X_norm, Y_norm)
-        similarity[np.isnan(similarity) | np.isinf(similarity)] = 0.0
-        return similarity
-
-
-### End code from langchain-community
