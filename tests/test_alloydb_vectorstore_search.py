@@ -152,7 +152,7 @@ class TestVectorStoreSearch:
         image.save("test_image_red.jpg")
         image = Image.new("RGB", (100, 100), color="green")
         image.save("test_image_green.jpg")
-        image = Image.new("RGB", (100, 100), color="blud")
+        image = Image.new("RGB", (100, 100), color="blue")
         image.save("test_image_blue.jpg")
         images = ["test_image_red.jpg", "test_image_green.jpg", "test_image_blue.jpg"]
         ids = [str(uuid.uuid4()) for i in range(len(images))]
