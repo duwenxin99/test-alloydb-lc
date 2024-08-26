@@ -19,12 +19,14 @@ import pytest
 import pytest_asyncio
 from langchain_core.documents import Document
 from langchain_core.embeddings import DeterministicFakeEmbedding
+from PIL import Image
 
 from langchain_google_alloydb_pg import AlloyDBEngine, AlloyDBVectorStore, Column
 from langchain_google_alloydb_pg.indexes import DistanceStrategy, HNSWQueryOptions
 
 DEFAULT_TABLE = "test_table" + str(uuid.uuid4()).replace("-", "_")
 CUSTOM_TABLE = "test_table_custom" + str(uuid.uuid4()).replace("-", "_")
+IMAGE_TABLE = "test_iamge_table" + str(uuid.uuid4()).replace("-", "_")
 VECTOR_SIZE = 768
 
 embeddings_service = DeterministicFakeEmbedding(size=VECTOR_SIZE)
@@ -136,6 +138,42 @@ class TestVectorStoreSearch:
         engine_sync._execute(f"DROP TABLE IF EXISTS {CUSTOM_TABLE}")
         engine_sync._engine.dispose()
 
+    @pytest_asyncio.fixture(scope="class")
+    async def image_vs(self, engine):
+        await engine.ainit_vectorstore_table(
+            IMAGE_TABLE, VECTOR_SIZE, store_metadata=False
+        )
+        vs = await AlloyDBVectorStore.create(
+            engine,
+            embedding_service=embeddings_service,
+            table_name=IMAGE_TABLE,
+        )
+        image = Image.new("RGB", (100, 100), color="red")
+        image.save(image_uri="test_image_red.jpg")
+        image = Image.new("RGB", (100, 100), color="green")
+        image.save(image_uri="test_image_green.jpg")
+        image = Image.new("RGB", (100, 100), color="blud")
+        image.save(image_uri="test_image_blue.jpg")
+        images = ["test_image_red.jpg", "test_image_green.jpg", "test_image_blue.jpg"]
+        ids = [str(uuid.uuid4()) for i in range(len(images))]
+        await vs.aadd_images(images, ids=ids)
+        yield vs
+
+        await engine._aexecute(f"DROP TABLE IF EXISTS {IMAGE_TABLE}")
+        os.remove("test_image_red.jpg")
+        os.remove("test_image_green.jpg")
+        os.remove("test_image_blue.jpg")
+        await engine._engine.dispose()
+
+    @pytest_asyncio.fixture(scope="class")
+    def image_uri(self):
+        image = Image.new("RGB", (100, 100), color="red")
+        image_uri = "test_image.jpg"
+        image.save(image_uri)
+        yield image_uri
+
+        os.remove(image_uri)
+
     async def test_asimilarity_search(self, vs):
         results = await vs.asimilarity_search("foo", k=1)
         assert len(results) == 1
@@ -143,15 +181,26 @@ class TestVectorStoreSearch:
         results = await vs.asimilarity_search("foo", k=1, filter="content = 'bar'")
         assert results == [Document(page_content="bar")]
 
+    async def test_image_asimilarity_search(self, image_vs, image_uri):
+        results = await image_vs.asimilarity_search(image_uri=image_uri, k=1)
+        assert len(results) == 1
+        encoded_image = image_vs.encode_image(image_uri)
+        assert results == [Document(page_content=encoded_image)]
+
     async def test_asimilarity_search_score(self, vs):
         results = await vs.asimilarity_search_with_score("foo")
         assert len(results) == 4
         assert results[0][0] == Document(page_content="foo")
         assert results[0][1] == 0
 
-    async def test_similarity_search_with_relevance_scores_threshold_cosine(
-        self, engine, vs
-    ):
+    async def test_image_asimilarity_search_score(self, image_vs, image_uri):
+        results = await image_vs.asimilarity_search_with_score(image_uri=image_uri)
+        assert len(results) == 4
+        encoded_image = image_vs.encode_image(image_uri)
+        assert results[0][0] == Document(page_content=encoded_image)
+        assert results[0][1] == 0
+
+    async def test_similarity_search_with_relevance_scores_threshold_cosine(self, vs):
         score_threshold = {"score_threshold": 0}
         results = await vs.asimilarity_search_with_relevance_scores(
             "foo", **score_threshold
