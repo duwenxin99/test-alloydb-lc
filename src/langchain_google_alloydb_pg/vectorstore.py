@@ -532,6 +532,57 @@ class AlloyDBVectorStore(VectorStore):
         return vs
 
     @classmethod
+    async def afrom_images(  # type: ignore[override]
+        cls: Type[AlloyDBVectorStore],
+        images: List[str],
+        embedding: Embeddings,
+        engine: AlloyDBEngine,
+        table_name: str,
+        metadatas: Optional[List[dict]] = None,
+        ids: Optional[List[str]] = None,
+        content_column: str = "content",
+        embedding_column: str = "embedding",
+        metadata_columns: List[str] = [],
+        ignore_metadata_columns: Optional[List[str]] = None,
+        id_column: str = "langchain_id",
+        metadata_json_column: str = "langchain_metadata",
+        **kwargs: Any,
+    ) -> AlloyDBVectorStore:
+        """Create an AlloyDBVectorStore instance from images.
+
+        Args:
+            images (List[str]): List of image URIs to add to the vector store.
+            embedding (Embeddings): Text embedding model to use.
+            engine (AlloyDBEngine): Connection pool engine for managing connections to AlloyDB database.
+            table_name (str): Name of an existing table.
+            metadatas (Optional[List[dict]]): List of metadatas to add to table records.
+            ids: (Optional[List[str]]): List of IDs to add to table records.
+            content_column (str): Column that represent a Document’s page_content. Defaults to "content".
+            embedding_column (str): Column for embedding vectors. The embedding is generated from the document value. Defaults to "embedding".
+            metadata_columns (List[str]): Column(s) that represent a document's metadata.
+            ignore_metadata_columns (List[str]): Column(s) to ignore in pre-existing tables for a document's metadata. Can not be used with metadata_columns. Defaults to None.
+            id_column (str): Column that represents the Document's id. Defaults to "langchain_id".
+            metadata_json_column (str): Column to store metadata as JSON. Defaults to "langchain_metadata".
+
+        Returns:
+            AlloyDBVectorStore
+        """
+
+        vs = await cls.create(
+            engine,
+            embedding,
+            table_name,
+            content_column,
+            embedding_column,
+            metadata_columns,
+            ignore_metadata_columns,
+            id_column,
+            metadata_json_column,
+        )
+        await vs.aadd_images(images=images, metadatas=metadatas, ids=ids, **kwargs)
+        return vs
+
+    @classmethod
     def from_texts(  # type: ignore[override]
         cls: Type[AlloyDBVectorStore],
         texts: List[str],
@@ -624,6 +675,59 @@ class AlloyDBVectorStore(VectorStore):
             embedding,
             engine,
             table_name,
+            content_column=content_column,
+            embedding_column=embedding_column,
+            metadata_columns=metadata_columns,
+            ignore_metadata_columns=ignore_metadata_columns,
+            metadata_json_column=metadata_json_column,
+            id_column=id_column,
+            ids=ids,
+            **kwargs,
+        )
+        return engine._run_as_sync(coro)
+
+    @classmethod
+    def from_images(  # type: ignore[override]
+        cls: Type[AlloyDBVectorStore],
+        images: List[str],
+        embedding: Embeddings,
+        engine: AlloyDBEngine,
+        table_name: str,
+        metadatas: Optional[List[dict]] = None,
+        ids: Optional[List[str]] = None,
+        content_column: str = "content",
+        embedding_column: str = "embedding",
+        metadata_columns: List[str] = [],
+        ignore_metadata_columns: Optional[List[str]] = None,
+        id_column: str = "langchain_id",
+        metadata_json_column: str = "langchain_metadata",
+        **kwargs: Any,
+    ) -> AlloyDBVectorStore:
+        """Create an AlloyDBVectorStore instance from images.
+
+        Args:
+            images (List[str]): List of image URIs to add to the vector store.
+            embedding (Embeddings): Text embedding model to use.
+            engine (AlloyDBEngine): Connection pool engine for managing connections to AlloyDB database.
+            table_name (str): Name of an existing table.
+            metadatas (Optional[List[dict]]): List of metadatas to add to table records.
+            ids: (Optional[List[str]]): List of IDs to add to table records.
+            content_column (str): Column that represent a Document’s page_content. Defaults to "content".
+            embedding_column (str): Column for embedding vectors. The embedding is generated from the document value. Defaults to "embedding".
+            metadata_columns (List[str]): Column(s) that represent a document's metadata.
+            ignore_metadata_columns (List[str]): Column(s) to ignore in pre-existing tables for a document's metadata. Can not be used with metadata_columns. Defaults to None.
+            id_column (str): Column that represents the Document's id. Defaults to "langchain_id".
+            metadata_json_column (str): Column to store metadata as JSON. Defaults to "langchain_metadata".
+
+        Returns:
+            AlloyDBVectorStore
+        """
+        coro = cls.afrom_images(
+            images,
+            embedding,
+            engine,
+            table_name,
+            metadatas=metadatas,
             content_column=content_column,
             embedding_column=embedding_column,
             metadata_columns=metadata_columns,

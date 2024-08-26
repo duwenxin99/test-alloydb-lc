@@ -19,13 +19,16 @@ import pytest
 import pytest_asyncio
 from langchain_core.documents import Document
 from langchain_core.embeddings import DeterministicFakeEmbedding
+from PIL import Image
 
 from langchain_google_alloydb_pg import AlloyDBEngine, AlloyDBVectorStore, Column
 
 DEFAULT_TABLE = "test_table" + str(uuid.uuid4())
 DEFAULT_TABLE_SYNC = "test_table_sync" + str(uuid.uuid4())
 CUSTOM_TABLE = "test_table_custom" + str(uuid.uuid4())
+IMAGE_TABLE = "test_image_table" + str(uuid.uuid4())
 VECTOR_SIZE = 768
+IMAGE_VECTOR_SIZE = 1024
 
 embeddings_service = DeterministicFakeEmbedding(size=VECTOR_SIZE)
 
@@ -139,6 +142,51 @@ class TestVectorStore:
         yield vs
         await engine._aexecute(f'DROP TABLE IF EXISTS "{CUSTOM_TABLE}"')
 
+    @pytest_asyncio.fixture(scope="class")
+    async def image_vs(self, engine):
+        await engine.ainit_vectorstore_table(
+            IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
+        )
+        vs = await AlloyDBVectorStore.create(
+            engine,
+            embedding_service=embeddings_service,
+            table_name=IMAGE_TABLE,
+        )
+        yield vs
+
+        await engine._aexecute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
+
+    @pytest_asyncio.fixture(scope="class")
+    async def image_vs_sync(self, engine_sync):
+        engine_sync.init_vectorstore_table(
+            IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
+        )
+        vs = AlloyDBVectorStore.create(
+            engine_sync,
+            embedding_service=embeddings_service,
+            table_name=IMAGE_TABLE,
+        )
+        yield vs
+
+        await engine_sync._aexecute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
+
+    @pytest_asyncio.fixture(scope="class")
+    async def image_uris(self):
+        image = Image.new("RGB", (100, 100), color="red")
+        image.save("test_image_red.jpg")
+        image = Image.new("RGB", (100, 100), color="green")
+        image.save("test_image_green.jpg")
+        image = Image.new("RGB", (100, 100), color="blue")
+        image.save("test_image_blue.jpg")
+        image_uris = [
+            "test_image_red.jpg",
+            "test_image_green.jpg",
+            "test_image_blue.jpg",
+        ]
+        yield image_uris
+        for uri in image_uris:
+            os.remove(uri)
+
     async def test_init_with_constructor(self, engine):
         with pytest.raises(Exception):
             AlloyDBVectorStore(
@@ -191,6 +239,12 @@ class TestVectorStore:
         results = await engine._afetch(f'SELECT * FROM "{DEFAULT_TABLE}"')
         assert len(results) == 3
         await engine._aexecute(f'TRUNCATE TABLE "{DEFAULT_TABLE}"')
+
+    async def test_aadd_images(self, engine, image_vs, image_uris):
+        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
+
+        await image_vs.aadd_images(image_uris, ids=ids)
+        await engine._aexecute(f'TRUNCATE TABLE "{IMAGE_TABLE}"')
 
     async def test_aadd_embedding(self, engine, vs):
         ids = [str(uuid.uuid4()) for i in range(len(texts))]
@@ -284,6 +338,13 @@ class TestVectorStore:
         vs_sync.add_texts(texts, ids=ids)
         results = engine_sync._fetch(f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"')
         assert len(results) == 6
+
+    def test_add_images(self, engine_sync, image_vs_sync, image_uris):
+        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
+
+        image_vs_sync.add_images(image_uris, ids=ids)
+        results = engine_sync._fetch(f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"')
+        assert len(results) == 3
 
     async def test_ignore_metadata_columns(self, vs_custom):
         column_to_ignore = "source"
