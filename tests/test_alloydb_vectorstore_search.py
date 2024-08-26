@@ -149,11 +149,11 @@ class TestVectorStoreSearch:
             table_name=IMAGE_TABLE,
         )
         image = Image.new("RGB", (100, 100), color="red")
-        image.save(image_uri="test_image_red.jpg")
+        image.save("test_image_red.jpg")
         image = Image.new("RGB", (100, 100), color="green")
-        image.save(image_uri="test_image_green.jpg")
+        image.save("test_image_green.jpg")
         image = Image.new("RGB", (100, 100), color="blud")
-        image.save(image_uri="test_image_blue.jpg")
+        image.save("test_image_blue.jpg")
         images = ["test_image_red.jpg", "test_image_green.jpg", "test_image_blue.jpg"]
         ids = [str(uuid.uuid4()) for i in range(len(images))]
         await vs.aadd_images(images, ids=ids)
