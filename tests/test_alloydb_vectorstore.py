@@ -15,6 +15,7 @@
 import os
 import uuid
 
+import numpy as np
 import pytest
 import pytest_asyncio
 from langchain_core.documents import Document
@@ -27,6 +28,7 @@ DEFAULT_TABLE = "test_table" + str(uuid.uuid4())
 DEFAULT_TABLE_SYNC = "test_table_sync" + str(uuid.uuid4())
 CUSTOM_TABLE = "test_table_custom" + str(uuid.uuid4())
 IMAGE_TABLE = "test_image_table" + str(uuid.uuid4())
+IMAGE_TABLE_SYNC = "test_image_table_sync" + str(uuid.uuid4())
 VECTOR_SIZE = 768
 IMAGE_VECTOR_SIZE = 1024
 
@@ -46,6 +48,17 @@ def get_env_var(key: str, desc: str) -> str:
     if v is None:
         raise ValueError(f'Must set env var "{key} to: "{desc}"')
     return v
+
+
+class FakeImageEmbedding:
+    def __init__(self, embedding_dim=1024):
+        self.embedding_dim = embedding_dim
+
+    def embed_image(self, image_path):
+        return np.random.rand(self.embedding_dim)
+
+
+image_embedding_service = FakeImageEmbedding(1024)
 
 
 @pytest.mark.asyncio(scope="class")
@@ -149,26 +162,26 @@ class TestVectorStore:
         )
         vs = await AlloyDBVectorStore.create(
             engine,
-            embedding_service=embeddings_service,
+            embedding_service=image_embedding_service,
             table_name=IMAGE_TABLE,
         )
         yield vs
-
         await engine._aexecute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
+        await engine._engine.dispose()
 
     @pytest_asyncio.fixture(scope="class")
     async def image_vs_sync(self, engine_sync):
         engine_sync.init_vectorstore_table(
-            IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
+            IMAGE_TABLE_SYNC, IMAGE_VECTOR_SIZE, store_metadata=False
         )
         vs = AlloyDBVectorStore.create(
             engine_sync,
-            embedding_service=embeddings_service,
-            table_name=IMAGE_TABLE,
+            embedding_service=image_embedding_service,
+            table_name=IMAGE_TABLE_SYNC,
         )
         yield vs
-
         await engine_sync._aexecute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
+        await engine_sync._engine.dispose()
 
     @pytest_asyncio.fixture(scope="class")
     async def image_uris(self):
@@ -242,8 +255,9 @@ class TestVectorStore:
 
     async def test_aadd_images(self, engine, image_vs, image_uris):
         ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
+        with pytest.raises(ValueError):
+            await image_vs.aadd_images(image_uris, ids=ids)
 
-        await image_vs.aadd_images(image_uris, ids=ids)
         await engine._aexecute(f'TRUNCATE TABLE "{IMAGE_TABLE}"')
 
     async def test_aadd_embedding(self, engine, vs):
@@ -341,7 +355,6 @@ class TestVectorStore:
 
     def test_add_images(self, engine_sync, image_vs_sync, image_uris):
         ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
-
         image_vs_sync.add_images(image_uris, ids=ids)
         results = engine_sync._fetch(f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"')
         assert len(results) == 3

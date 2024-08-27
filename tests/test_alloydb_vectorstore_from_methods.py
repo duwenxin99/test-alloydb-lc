@@ -15,6 +15,7 @@
 import os
 import uuid
 
+import numpy as np
 import pytest
 import pytest_asyncio
 from langchain_core.documents import Document
@@ -48,6 +49,17 @@ def get_env_var(key: str, desc: str) -> str:
     if v is None:
         raise ValueError(f"Must set env var {key} to: {desc}")
     return v
+
+
+class FakeImageEmbedding:
+    def __init__(self, embedding_dim=1024):
+        self.embedding_dim = embedding_dim
+
+    def embed_image(self, image_path):
+        return np.random.rand(self.embedding_dim)
+
+
+image_embedding_service = FakeImageEmbedding(1024)
 
 
 @pytest.mark.asyncio
@@ -244,7 +256,7 @@ class TestVectorStoreFromMethods:
         ids = [str(uuid.uuid4()) for i in range(len(texts))]
         await AlloyDBVectorStore.afrom_images(
             image_uris,
-            embeddings_service,
+            image_embedding_service,
             engine,
             IMAGE_TABLE_SYNC,
             metadatas=metadatas,
@@ -259,7 +271,7 @@ class TestVectorStoreFromMethods:
         ids = [str(uuid.uuid4()) for i in range(len(texts))]
         await AlloyDBVectorStore.afrom_images(
             image_uris,
-            embeddings_service,
+            image_embedding_service,
             engine_sync,
             IMAGE_TABLE_SYNC,
             metadatas=metadatas,

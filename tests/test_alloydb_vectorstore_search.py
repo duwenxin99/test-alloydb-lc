@@ -148,14 +148,14 @@ class TestVectorStoreSearch:
         os.remove(image_uri)
 
     async def test_asimilarity_search(self, vs):
-        results = await vs.asimilarity_search("foo", k=1)
+        results = await vs.asimilarity_search(query="foo", k=1)
         assert len(results) == 1
         assert results == [Document(page_content="foo")]
         results = await vs.asimilarity_search("foo", k=1, filter="content = 'bar'")
         assert results == [Document(page_content="bar")]
 
     async def test_asimilarity_search_score(self, vs):
-        results = await vs.asimilarity_search_with_score("foo")
+        results = await vs.asimilarity_search_with_score(query="foo")
         assert len(results) == 4
         assert results[0][0] == Document(page_content="foo")
         assert results[0][1] == 0
