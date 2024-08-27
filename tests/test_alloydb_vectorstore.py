@@ -55,7 +55,7 @@ class FakeImageEmbedding:
         self.embedding_dim = embedding_dim
 
     def embed_image(self, image_path):
-        return np.random.rand(self.embedding_dim)
+        return list(np.random.rand(self.embedding_dim))
 
 
 image_embedding_service = FakeImageEmbedding(1024)
@@ -180,8 +180,8 @@ class TestVectorStore:
             table_name=IMAGE_TABLE_SYNC,
         )
         yield vs
-        await engine_sync._aexecute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
-        await engine_sync._engine.dispose()
+        engine_sync._execute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
+        engine_sync._engine.dispose()
 
     @pytest_asyncio.fixture(scope="class")
     async def image_uris(self):

@@ -269,7 +269,7 @@ class TestVectorStoreFromMethods:
 
     async def test_from_images(self, engine_sync, image_uris):
         ids = [str(uuid.uuid4()) for i in range(len(texts))]
-        await AlloyDBVectorStore.afrom_images(
+        AlloyDBVectorStore.from_images(
             image_uris,
             image_embedding_service,
             engine_sync,
