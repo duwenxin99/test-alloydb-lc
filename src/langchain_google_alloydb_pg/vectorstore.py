@@ -785,7 +785,7 @@ class AlloyDBVectorStore(VectorStore):
     def similarity_search(
         self,
         query: Optional[str] = None,
-        images: Optional[str] = None,
+        image_uri: Optional[str] = None,
         k: Optional[int] = None,
         filter: Optional[str] = None,
         **kwargs: Any,

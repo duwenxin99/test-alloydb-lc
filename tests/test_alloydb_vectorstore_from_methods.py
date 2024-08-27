@@ -56,7 +56,7 @@ class FakeImageEmbedding:
         self.embedding_dim = embedding_dim
 
     def embed_image(self, image_path):
-        return np.random.rand(self.embedding_dim)
+        return list(np.random.rand(self.embedding_dim))
 
 
 image_embedding_service = FakeImageEmbedding(1024)
