@@ -254,7 +254,7 @@ class TestVectorStore:
     async def test_aadd_images(self, engine, image_vs, image_uris):
         ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
         await image_vs.aadd_images(image_uris, ids=ids)
-        results = await engine._afetch(f'SELECT * FROM "{DEFAULT_TABLE}"')
+        results = await engine._afetch(f'SELECT * FROM "{IMAGE_TABLE}"')
         assert len(results) == 3
         await engine._aexecute(f'TRUNCATE TABLE "{IMAGE_TABLE}"')
 
@@ -354,7 +354,7 @@ class TestVectorStore:
     def test_add_images(self, engine_sync, image_vs_sync, image_uris):
         ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
         image_vs_sync.add_images(image_uris, ids=ids)
-        results = engine_sync._fetch(f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"')
+        results = engine_sync._fetch(f'SELECT * FROM "{IMAGE_TABLE_SYNC}"')
         assert len(results) == 3
 
     async def test_ignore_metadata_columns(self, vs_custom):

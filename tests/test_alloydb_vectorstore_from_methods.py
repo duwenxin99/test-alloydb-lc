@@ -256,7 +256,7 @@ class TestVectorStoreFromMethods:
             image_uris,
             image_embedding_service,
             engine,
-            IMAGE_TABLE_SYNC,
+            IMAGE_TABLE,
             metadatas=metadatas,
             ids=ids,
         )
