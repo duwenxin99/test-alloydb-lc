@@ -57,7 +57,7 @@ class FakeImageEmbedding(DeterministicFakeEmbedding):
         return self.embed_query(image_path)
 
 
-image_embedding_service = FakeImageEmbedding()
+image_embedding_service = FakeImageEmbedding(size=IMAGE_VECTOR_SIZE)
 
 
 @pytest.mark.asyncio
