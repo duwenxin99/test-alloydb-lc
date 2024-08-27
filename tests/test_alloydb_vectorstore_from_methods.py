@@ -53,8 +53,8 @@ def get_env_var(key: str, desc: str) -> str:
 
 class FakeImageEmbedding(DeterministicFakeEmbedding):
 
-    def embed_image(self, image_path):
-        return self.embed_query(image_path)
+    def embed_image(self, image_paths):
+        return [self.embed_query(path) for path in image_paths]
 
 
 image_embedding_service = FakeImageEmbedding(size=IMAGE_VECTOR_SIZE)
@@ -251,7 +251,7 @@ class TestVectorStoreFromMethods:
         await engine._aexecute(f"TRUNCATE TABLE {CUSTOM_TABLE}")
 
     async def test_afrom_images(self, engine, image_uris):
-        ids = [str(uuid.uuid4()) for i in range(len(texts))]
+        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
         await AlloyDBVectorStore.afrom_images(
             image_uris,
             image_embedding_service,
@@ -266,7 +266,7 @@ class TestVectorStoreFromMethods:
         await engine._aexecute(f"TRUNCATE TABLE {IMAGE_TABLE}")
 
     async def test_from_images(self, engine_sync, image_uris):
-        ids = [str(uuid.uuid4()) for i in range(len(texts))]
+        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
         AlloyDBVectorStore.from_images(
             image_uris,
             image_embedding_service,

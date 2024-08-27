@@ -253,9 +253,9 @@ class TestVectorStore:
 
     async def test_aadd_images(self, engine, image_vs, image_uris):
         ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
-        with pytest.raises(ValueError):
-            await image_vs.aadd_images(image_uris, ids=ids)
-
+        await image_vs.aadd_images(image_uris, ids=ids)
+        results = await engine._afetch(f'SELECT * FROM "{DEFAULT_TABLE}"')
+        assert len(results) == 3
         await engine._aexecute(f'TRUNCATE TABLE "{IMAGE_TABLE}"')
 
     async def test_aadd_embedding(self, engine, vs):
