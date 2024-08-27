@@ -52,14 +52,12 @@ def get_env_var(key: str, desc: str) -> str:
 
 
 class FakeImageEmbedding(DeterministicFakeEmbedding):
-    def __init__(self, embedding_dim=1024):
-        self.embedding_dim = embedding_dim
 
     def embed_image(self, image_path):
         return self.embed_query(image_path)
 
 
-image_embedding_service = FakeImageEmbedding(1024)
+image_embedding_service = FakeImageEmbedding()
 
 
 @pytest.mark.asyncio
