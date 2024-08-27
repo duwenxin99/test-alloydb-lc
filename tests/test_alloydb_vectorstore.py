@@ -50,15 +50,13 @@ def get_env_var(key: str, desc: str) -> str:
     return v
 
 
-class FakeImageEmbedding:
-    def __init__(self, embedding_dim=1024):
-        self.embedding_dim = embedding_dim
+class FakeImageEmbedding(DeterministicFakeEmbedding):
 
-    def embed_image(self, image_path):
-        return list(np.random.rand(self.embedding_dim))
+    def embed_image(self, image_paths: list[str]):
+        return [self.embed_query(path) for path in image_paths]
 
 
-image_embedding_service = FakeImageEmbedding(1024)
+image_embedding_service = FakeImageEmbedding(size=IMAGE_VECTOR_SIZE)
 
 
 @pytest.mark.asyncio(scope="class")
@@ -174,7 +172,7 @@ class TestVectorStore:
         engine_sync.init_vectorstore_table(
             IMAGE_TABLE_SYNC, IMAGE_VECTOR_SIZE, store_metadata=False
         )
-        vs = AlloyDBVectorStore.create(
+        vs = AlloyDBVectorStore.create_sync(
             engine_sync,
             embedding_service=image_embedding_service,
             table_name=IMAGE_TABLE_SYNC,
