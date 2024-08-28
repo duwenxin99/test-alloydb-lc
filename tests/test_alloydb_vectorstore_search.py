@@ -109,23 +109,6 @@ class TestVectorStoreSearch:
         await engine._engine.dispose()
 
     @pytest_asyncio.fixture(scope="class")
-    async def image_uris(self):
-        image = Image.new("RGB", (100, 100), color="red")
-        image.save("test_image_red_from.jpg")
-        image = Image.new("RGB", (100, 100), color="green")
-        image.save("test_image_green_from.jpg")
-        image = Image.new("RGB", (100, 100), color="blue")
-        image.save("test_image_blue_from.jpg")
-        image_uris = [
-            "test_image_red_from.jpg",
-            "test_image_green_from.jpg",
-            "test_image_blue_from.jpg",
-        ]
-        yield image_uris
-        for uri in image_uris:
-            os.remove(uri)
-
-    @pytest_asyncio.fixture(scope="class")
     def engine_sync(self, db_project, db_region, db_instance, db_cluster, db_name):
         engine = AlloyDBEngine.from_instance(
             project_id=db_project,
@@ -167,10 +150,25 @@ class TestVectorStoreSearch:
         engine_sync._engine.dispose()
 
     @pytest_asyncio.fixture(scope="class")
+    async def image_uris(self):
+        image = Image.new("RGB", (100, 100), color="red")
+        image.save("test_image_red_from.jpg")
+        image = Image.new("RGB", (100, 100), color="green")
+        image.save("test_image_green_from.jpg")
+        image = Image.new("RGB", (100, 100), color="blue")
+        image.save("test_image_blue_from.jpg")
+        image_uris = [
+            "test_image_red_from.jpg",
+            "test_image_green_from.jpg",
+            "test_image_blue_from.jpg",
+        ]
+        yield image_uris
+        for uri in image_uris:
+            os.remove(uri)
+
+    @pytest_asyncio.fixture(scope="class")
     async def image_vs(self, engine, image_uris):
-        await engine.ainit_vectorstore_table(
-            IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
-        )
+        await engine.ainit_vectorstore_table(IMAGE_TABLE, IMAGE_VECTOR_SIZE)
         vs = await AlloyDBVectorStore.create(
             engine,
             embedding_service=image_embedding_service,
@@ -184,9 +182,7 @@ class TestVectorStoreSearch:
 
     @pytest_asyncio.fixture(scope="class")
     async def image_vs_sync(self, engine_sync):
-        engine_sync.init_vectorstore_table(
-            IMAGE_TABLE_SYNC, IMAGE_VECTOR_SIZE, store_metadata=False
-        )
+        engine_sync.init_vectorstore_table(IMAGE_TABLE_SYNC, IMAGE_VECTOR_SIZE)
         vs = AlloyDBVectorStore.create_sync(
             engine_sync,
             embedding_service=image_embedding_service,

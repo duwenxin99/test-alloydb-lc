@@ -155,9 +155,7 @@ class TestVectorStore:
 
     @pytest_asyncio.fixture(scope="class")
     async def image_vs(self, engine):
-        await engine.ainit_vectorstore_table(
-            IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
-        )
+        await engine.ainit_vectorstore_table(IMAGE_TABLE, IMAGE_VECTOR_SIZE)
         vs = await AlloyDBVectorStore.create(
             engine,
             embedding_service=image_embedding_service,
@@ -169,9 +167,7 @@ class TestVectorStore:
 
     @pytest_asyncio.fixture(scope="class")
     async def image_vs_sync(self, engine_sync):
-        engine_sync.init_vectorstore_table(
-            IMAGE_TABLE_SYNC, IMAGE_VECTOR_SIZE, store_metadata=False
-        )
+        engine_sync.init_vectorstore_table(IMAGE_TABLE_SYNC, IMAGE_VECTOR_SIZE)
         vs = AlloyDBVectorStore.create_sync(
             engine_sync,
             embedding_service=image_embedding_service,
