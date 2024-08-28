@@ -890,8 +890,6 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         """
-        Default similarity search with relevance scores. Modify if necessary
-        in subclass.
         Return docs and relevance scores in the range [0, 1].
 
         0 is dissimilar, 1 is most similar.
@@ -920,8 +918,6 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         """
-        Default similarity search with relevance scores. Modify if necessary
-        in subclass.
         Return docs and relevance scores in the range [0, 1].
 
         0 is dissimilar, 1 is most similar.
