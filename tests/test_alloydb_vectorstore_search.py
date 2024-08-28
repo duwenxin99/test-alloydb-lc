@@ -188,7 +188,6 @@ class TestVectorStoreSearch:
             embedding_service=image_embedding_service,
             table_name=IMAGE_TABLE_SYNC,
         )
-        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
         yield vs
         engine_sync._execute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
         engine_sync._engine.dispose()
@@ -303,9 +302,9 @@ class TestVectorStoreSearch:
         assert results[0] == Document(page_content="boo")
 
     async def test_image_amax_marginal_relevance_search(self, image_vs, image_uris):
-        results = await image_vs.amax_marginal_relevance_search(image_uris[1])
+        results = await image_vs.amax_marginal_relevance_search(image_uris[0])
         assert len(results) == 3
-        assert results[0].metadata["image_uri"] == image_uris[1]
+        assert results[0].metadata["image_uri"] == image_uris[0]
 
     async def test_amax_marginal_relevance_search_vector(self, vs):
         embedding = embeddings_service.embed_query("bar")
