@@ -108,6 +108,23 @@ class TestVectorStoreSearch:
         await engine._engine.dispose()
 
     @pytest_asyncio.fixture(scope="class")
+    async def image_uris(self):
+        image = Image.new("RGB", (100, 100), color="red")
+        image.save("test_image_red_from.jpg")
+        image = Image.new("RGB", (100, 100), color="green")
+        image.save("test_image_green_from.jpg")
+        image = Image.new("RGB", (100, 100), color="blue")
+        image.save("test_image_blue_from.jpg")
+        image_uris = [
+            "test_image_red_from.jpg",
+            "test_image_green_from.jpg",
+            "test_image_blue_from.jpg",
+        ]
+        yield image_uris
+        for uri in image_uris:
+            os.remove(uri)
+
+    @pytest_asyncio.fixture(scope="class")
     async def image_vs(self, engine, image_uris):
         await engine.ainit_vectorstore_table(
             IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
@@ -163,15 +180,6 @@ class TestVectorStoreSearch:
 
         engine_sync._execute(f"DROP TABLE IF EXISTS {CUSTOM_TABLE}")
         engine_sync._engine.dispose()
-
-    @pytest_asyncio.fixture(scope="class")
-    def image_uri(self):
-        image = Image.new("RGB", (100, 100), color="red")
-        image_uri = "test_image.jpg"
-        image.save(image_uri)
-        yield image_uri
-
-        os.remove(image_uri)
 
     async def test_asimilarity_search(self, vs):
         results = await vs.asimilarity_search(query="foo", k=1)
