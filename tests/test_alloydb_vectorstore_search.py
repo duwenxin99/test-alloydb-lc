@@ -135,7 +135,7 @@ class TestVectorStoreSearch:
             table_name=IMAGE_TABLE,
         )
         ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
-        await vs.aadd_documents(docs, ids=ids)
+        await vs.aadd_images(image_uris, ids=ids)
         yield vs
         await engine._aexecute(f"DROP TABLE IF EXISTS {DEFAULT_TABLE}")
         await engine._engine.dispose()
