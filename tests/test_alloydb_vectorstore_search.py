@@ -158,9 +158,9 @@ class TestVectorStoreSearch:
         image = Image.new("RGB", (100, 100), color="blue")
         image.save("test_image_blue_from.jpg")
         image_uris = [
-            "test_image_red_from.jpg",
-            "test_image_green_from.jpg",
-            "test_image_blue_from.jpg",
+            "test_image_red_search.jpg",
+            "test_image_green_search.jpg",
+            "test_image_blue_search.jpg",
         ]
         yield image_uris
         for uri in image_uris:
@@ -188,6 +188,7 @@ class TestVectorStoreSearch:
             embedding_service=image_embedding_service,
             table_name=IMAGE_TABLE_SYNC,
         )
+        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
         yield vs
         engine_sync._execute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
         engine_sync._engine.dispose()
@@ -287,7 +288,7 @@ class TestVectorStoreSearch:
         assert results[0][1] == 0
 
     async def test_image_asimilarity_search_by_vector(self, image_vs, image_uris):
-        embedding = image_embedding_service.embed_image([image_uris[0]])
+        embedding = image_embedding_service.embed_image([image_uris[0]])[0]
         results = await image_vs.asimilarity_search_by_vector(embedding)
         assert len(results) == 3
         assert results[0][0].metadata["image_uri"] == image_uris[0]
@@ -303,7 +304,7 @@ class TestVectorStoreSearch:
 
     async def test_image_amax_marginal_relevance_search(self, image_vs, image_uris):
         results = await image_vs.amax_marginal_relevance_search(image_uris[1])
-        assert len(results) == 0
+        assert len(results) == 3
         assert results[0].metadata["image_uri"] == image_uris[1]
 
     async def test_amax_marginal_relevance_search_vector(self, vs):
