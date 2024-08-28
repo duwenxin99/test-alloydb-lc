@@ -181,15 +181,17 @@ class TestVectorStoreSearch:
         await engine._engine.dispose()
 
     @pytest_asyncio.fixture(scope="class")
-    async def image_vs_sync(self, engine_sync):
+    async def image_vs_sync(self, engine_sync, image_uris):
         engine_sync.init_vectorstore_table(IMAGE_TABLE_SYNC, IMAGE_VECTOR_SIZE)
         vs = AlloyDBVectorStore.create_sync(
             engine_sync,
             embedding_service=image_embedding_service,
             table_name=IMAGE_TABLE_SYNC,
         )
+        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
+        await vs.add_images(image_uris, ids=ids)
         yield vs
-        engine_sync._execute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
+        engine_sync._execute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE_SYNC}"')
         engine_sync._engine.dispose()
 
     async def test_asimilarity_search(self, vs):
@@ -290,6 +292,8 @@ class TestVectorStoreSearch:
         embedding = image_embedding_service.embed_image([image_uris[0]])[0]
         results = await image_vs.asimilarity_search_by_vector(embedding)
         assert len(results) == 3
+        assert results[0].metadata["image_uri"] == image_uris[0]
+        results = await image_vs.asimilarity_search_with_score_by_vector(embedding)
         assert results[0][0].metadata["image_uri"] == image_uris[0]
         assert results[0][1] == 0
 
@@ -361,7 +365,7 @@ class TestVectorStoreSearch:
         assert results[0][1] == 0
 
     async def test_image_similarity_search_by_vector(self, image_vs_sync, image_uris):
-        embedding = image_embedding_service.embed_image([image_uris[0]])
+        embedding = image_embedding_service.embed_image([image_uris[0]])[0]
         results = image_vs_sync.similarity_search_by_vector(embedding)
         assert len(results) == 3
         assert results[0][0].metadata["image_uri"] == image_uris[0]
