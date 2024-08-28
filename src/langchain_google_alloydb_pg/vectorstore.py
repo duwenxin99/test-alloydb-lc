@@ -912,7 +912,7 @@ class AlloyDBVectorStore(VectorStore):
 
     def _similarity_search_with_relevance_scores(
         self,
-        query: str,
+        query: Optional[str] = None,
         image_uri: Optional[str] = None,
         k: int = 4,
         **kwargs: Any,
