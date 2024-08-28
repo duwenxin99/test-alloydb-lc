@@ -27,6 +27,7 @@ from langchain_google_alloydb_pg.indexes import DistanceStrategy, HNSWQueryOptio
 DEFAULT_TABLE = "test_table" + str(uuid.uuid4()).replace("-", "_")
 CUSTOM_TABLE = "test_table_custom" + str(uuid.uuid4()).replace("-", "_")
 IMAGE_TABLE = "test_iamge_table" + str(uuid.uuid4()).replace("-", "_")
+IMAGE_TABLE_SYNC = "test_iamge_table_sync" + str(uuid.uuid4()).replace("-", "_")
 VECTOR_SIZE = 768
 IMAGE_VECTOR_SIZE = 1024
 
@@ -125,22 +126,6 @@ class TestVectorStoreSearch:
             os.remove(uri)
 
     @pytest_asyncio.fixture(scope="class")
-    async def image_vs(self, engine, image_uris):
-        await engine.ainit_vectorstore_table(
-            IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
-        )
-        vs = await AlloyDBVectorStore.create(
-            engine,
-            embedding_service=image_embedding_service,
-            table_name=IMAGE_TABLE,
-        )
-        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
-        await vs.aadd_images(image_uris, ids=ids)
-        yield vs
-        await engine._aexecute(f"DROP TABLE IF EXISTS {DEFAULT_TABLE}")
-        await engine._engine.dispose()
-
-    @pytest_asyncio.fixture(scope="class")
     def engine_sync(self, db_project, db_region, db_instance, db_cluster, db_name):
         engine = AlloyDBEngine.from_instance(
             project_id=db_project,
@@ -179,6 +164,36 @@ class TestVectorStoreSearch:
         yield vs_custom
 
         engine_sync._execute(f"DROP TABLE IF EXISTS {CUSTOM_TABLE}")
+        engine_sync._engine.dispose()
+
+    @pytest_asyncio.fixture(scope="class")
+    async def image_vs(self, engine, image_uris):
+        await engine.ainit_vectorstore_table(
+            IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
+        )
+        vs = await AlloyDBVectorStore.create(
+            engine,
+            embedding_service=image_embedding_service,
+            table_name=IMAGE_TABLE,
+        )
+        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
+        await vs.aadd_images(image_uris, ids=ids)
+        yield vs
+        await engine._aexecute(f"DROP TABLE IF EXISTS {DEFAULT_TABLE}")
+        await engine._engine.dispose()
+
+    @pytest_asyncio.fixture(scope="class")
+    async def image_vs_sync(self, engine_sync):
+        engine_sync.init_vectorstore_table(
+            IMAGE_TABLE_SYNC, IMAGE_VECTOR_SIZE, store_metadata=False
+        )
+        vs = AlloyDBVectorStore.create_sync(
+            engine_sync,
+            embedding_service=image_embedding_service,
+            table_name=IMAGE_TABLE_SYNC,
+        )
+        yield vs
+        engine_sync._execute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE}"')
         engine_sync._engine.dispose()
 
     async def test_asimilarity_search(self, vs):
@@ -245,22 +260,22 @@ class TestVectorStoreSearch:
         assert results[0][0] == Document(page_content="foo")
 
     async def test_image_similarity_search_with_relevance_scores_threshold_cosine(
-        self, image_vs, image_uris
+        self, image_vs_sync, image_uris
     ):
         score_threshold = {"score_threshold": 0}
-        results = await image_vs.asimilarity_search_with_relevance_scores(
+        results = await image_vs_sync.asimilarity_search_with_relevance_scores(
             image_uri=image_uris[0], **score_threshold
         )
         assert len(results) == 4
 
         score_threshold = {"score_threshold": 0.02}
-        results = await image_vs.asimilarity_search_with_relevance_scores(
+        results = await image_vs_sync.asimilarity_search_with_relevance_scores(
             image_uri=None, **score_threshold
         )
         assert len(results) == 2
 
         score_threshold = {"score_threshold": 0.9}
-        results = await image_vs.asimilarity_search_with_relevance_scores(
+        results = await image_vs_sync.asimilarity_search_with_relevance_scores(
             image_uri=None, **score_threshold
         )
         assert len(results) == 1
@@ -292,6 +307,7 @@ class TestVectorStoreSearch:
 
     async def test_image_amax_marginal_relevance_search(self, image_vs, image_uris):
         results = await image_vs.amax_marginal_relevance_search(image_uris[1])
+        assert len(results) == 0
         assert results[0].metadata["image_uri"] == image_uris[1]
 
     async def test_amax_marginal_relevance_search_vector(self, vs):
@@ -320,8 +336,8 @@ class TestVectorStoreSearch:
         )
         assert results == [Document(page_content="bar")]
 
-    def test_image_similarity_search(self, image_vs, image_uris):
-        results = image_vs.similarity_search(image_uri=image_uris[0], k=1)
+    def test_image_similarity_search(self, image_vs_sync, image_uris):
+        results = image_vs_sync.similarity_search(image_uri=image_uris[0], k=1)
         assert len(results) == 1
         assert results[0].metadata["image_uri"] == image_uris[0]
 
@@ -331,8 +347,10 @@ class TestVectorStoreSearch:
         assert results[0][0] == Document(page_content="foo")
         assert results[0][1] == 0
 
-    def test_image_similarity_search_score(self, image_vs, image_uris):
-        results = image_vs.similarity_search_with_score(image_uri=image_uris[0], k=1)
+    def test_image_similarity_search_score(self, image_vs_sync, image_uris):
+        results = image_vs_sync.similarity_search_with_score(
+            image_uri=image_uris[0], k=1
+        )
         assert len(results) == 1
         assert results[0][0].metadata["image_uri"] == image_uris[0]
         assert results[0][1] == 0
@@ -346,9 +364,9 @@ class TestVectorStoreSearch:
         assert results[0][0] == Document(page_content="foo")
         assert results[0][1] == 0
 
-    async def test_image_similarity_search_by_vector(self, image_vs, image_uris):
+    async def test_image_similarity_search_by_vector(self, image_vs_sync, image_uris):
         embedding = image_embedding_service.embed_image([image_uris[0]])
-        results = image_vs.similarity_search_by_vector(embedding)
+        results = image_vs_sync.similarity_search_by_vector(embedding)
         assert len(results) == 3
         assert results[0][0].metadata["image_uri"] == image_uris[0]
         assert results[0][1] == 0
