@@ -189,7 +189,7 @@ class TestVectorStoreSearch:
             table_name=IMAGE_TABLE_SYNC,
         )
         ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
-        await vs.add_images(image_uris, ids=ids)
+        vs.add_images(image_uris, ids=ids)
         yield vs
         engine_sync._execute(f'DROP TABLE IF EXISTS "{IMAGE_TABLE_SYNC}"')
         engine_sync._engine.dispose()
