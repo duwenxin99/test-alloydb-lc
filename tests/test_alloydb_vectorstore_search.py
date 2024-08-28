@@ -152,11 +152,11 @@ class TestVectorStoreSearch:
     @pytest_asyncio.fixture(scope="class")
     async def image_uris(self):
         image = Image.new("RGB", (100, 100), color="red")
-        image.save("test_image_red_from.jpg")
+        image.save("test_image_red_search.jpg")
         image = Image.new("RGB", (100, 100), color="green")
-        image.save("test_image_green_from.jpg")
+        image.save("test_image_green_search.jpg")
         image = Image.new("RGB", (100, 100), color="blue")
-        image.save("test_image_blue_from.jpg")
+        image.save("test_image_blue_search.jpg")
         image_uris = [
             "test_image_red_search.jpg",
             "test_image_green_search.jpg",
