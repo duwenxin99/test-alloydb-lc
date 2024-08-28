@@ -19,6 +19,7 @@ import pytest
 import pytest_asyncio
 from langchain_core.documents import Document
 from langchain_core.embeddings import DeterministicFakeEmbedding
+from PIL import Image
 
 from langchain_google_alloydb_pg import AlloyDBEngine, AlloyDBVectorStore, Column
 from langchain_google_alloydb_pg.indexes import DistanceStrategy, HNSWQueryOptions
@@ -46,6 +47,15 @@ def get_env_var(key: str, desc: str) -> str:
     if v is None:
         raise ValueError(f"Must set env var {key} to: {desc}")
     return v
+
+
+class FakeImageEmbedding(DeterministicFakeEmbedding):
+
+    def embed_image(self, image_paths: list[str]):
+        return [self.embed_query(path) for path in image_paths]
+
+
+image_embedding_service = FakeImageEmbedding(size=IMAGE_VECTOR_SIZE)
 
 
 @pytest.mark.asyncio(scope="class")
@@ -92,6 +102,22 @@ class TestVectorStoreSearch:
             table_name=DEFAULT_TABLE,
         )
         ids = [str(uuid.uuid4()) for i in range(len(texts))]
+        await vs.aadd_documents(docs, ids=ids)
+        yield vs
+        await engine._aexecute(f"DROP TABLE IF EXISTS {DEFAULT_TABLE}")
+        await engine._engine.dispose()
+    
+    @pytest_asyncio.fixture(scope="class")
+    async def image_vs(self, engine, image_uris):
+        await engine.ainit_vectorstore_table(
+            IMAGE_TABLE, IMAGE_VECTOR_SIZE, store_metadata=False
+        )
+        vs = await AlloyDBVectorStore.create(
+            engine,
+            embedding_service=image_embedding_service,
+            table_name=IMAGE_TABLE,
+        )
+        ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
         await vs.aadd_documents(docs, ids=ids)
         yield vs
         await engine._aexecute(f"DROP TABLE IF EXISTS {DEFAULT_TABLE}")
@@ -154,13 +180,26 @@ class TestVectorStoreSearch:
         results = await vs.asimilarity_search("foo", k=1, filter="content = 'bar'")
         assert results == [Document(page_content="bar")]
 
+    async def test_image_asimilarity_search(self, image_vs, image_uris):
+        results = await image_vs.asimilarity_search(image_uri=image_uris[0], k=1)
+        assert len(results) == 1
+        assert results[0].metadata["image_uri"] == image_uris[0]
+
     async def test_asimilarity_search_score(self, vs):
         results = await vs.asimilarity_search_with_score(query="foo")
         assert len(results) == 4
         assert results[0][0] == Document(page_content="foo")
         assert results[0][1] == 0
 
-    async def test_similarity_search_with_relevance_scores_threshold_cosine(self, vs):
+    async def test_image_asimilarity_search_score(self, image_vs, image_uris):
+        results = await image_vs.asimilarity_search_with_score(
+            image_uri=image_uris[0], k=1
+        )
+        assert len(results) == 1
+        assert results[0][0].metadata["image_uri"] == image_uris[0]
+        assert results[0][1] == 0
+
+    async def test_asimilarity_search_with_relevance_scores_threshold_cosine(self, vs):
         score_threshold = {"score_threshold": 0}
         results = await vs.asimilarity_search_with_relevance_scores(
             query="foo", image_uri=None, **score_threshold
@@ -180,7 +219,7 @@ class TestVectorStoreSearch:
         assert len(results) == 1
         assert results[0][0] == Document(page_content="foo")
 
-    async def test_similarity_search_with_relevance_scores_threshold_euclidean(
+    async def test_asimilarity_search_with_relevance_scores_threshold_euclidean(
         self, engine
     ):
         vs = await AlloyDBVectorStore.create(
@@ -197,6 +236,28 @@ class TestVectorStoreSearch:
         assert len(results) == 1
         assert results[0][0] == Document(page_content="foo")
 
+    async def test_image_similarity_search_with_relevance_scores_threshold_cosine(
+        self, image_vs, image_uris
+    ):
+        score_threshold = {"score_threshold": 0}
+        results = await image_vs.asimilarity_search_with_relevance_scores(
+            image_uri=image_uris[0], **score_threshold
+        )
+        assert len(results) == 4
+
+        score_threshold = {"score_threshold": 0.02}
+        results = await image_vs.asimilarity_search_with_relevance_scores(
+            image_uri=None, **score_threshold
+        )
+        assert len(results) == 2
+
+        score_threshold = {"score_threshold": 0.9}
+        results = await image_vs.asimilarity_search_with_relevance_scores(
+            image_uri=None, **score_threshold
+        )
+        assert len(results) == 1
+        assert results[0][0].metadata["image_uri"] == image_uris[0]
+
     async def test_asimilarity_search_by_vector(self, vs):
         embedding = embeddings_service.embed_query("foo")
         results = await vs.asimilarity_search_by_vector(embedding)
@@ -206,8 +267,23 @@ class TestVectorStoreSearch:
         assert results[0][0] == Document(page_content="foo")
         assert results[0][1] == 0
 
+    async def test_image_asimilarity_search_by_vector(self, image_vs, image_uris):
+        embedding = image_embedding_service.embed_image([image_uris[0]])
+        results = await image_vs.asimilarity_search_by_vector(embedding)
+        assert len(results) == 3
+        assert results[0][0].metadata["image_uri"] == image_uris[0]
+        assert results[0][1] == 0
+
     async def test_amax_marginal_relevance_search(self, vs):
         results = await vs.amax_marginal_relevance_search("bar")
+        assert results[0] == Document(page_content="bar")
+        results = await vs.amax_marginal_relevance_search(
+            query="bar", image_uri=None, filter="content = 'boo'"
+        )
+        assert results[0] == Document(page_content="boo")
+
+    async def test_image_amax_marginal_relevance_search(self, image_vs, image_uri=):
+        results = await vs.amax_marginal_relevance_search(image_uri=)
         assert results[0] == Document(page_content="bar")
         results = await vs.amax_marginal_relevance_search(
             query="bar", image_uri=None, filter="content = 'boo'"
@@ -240,10 +316,21 @@ class TestVectorStoreSearch:
         )
         assert results == [Document(page_content="bar")]
 
+    def test_image_similarity_search(self, image_vs, image_uris):
+        results = image_vs.similarity_search(image_uri=image_uris[0], k=1)
+        assert len(results) == 1
+        assert results[0].metadata["image_uri"] == image_uris[0]
+
     def test_similarity_search_score(self, vs_custom):
         results = vs_custom.similarity_search_with_score("foo")
         assert len(results) == 4
         assert results[0][0] == Document(page_content="foo")
+        assert results[0][1] == 0
+
+    def test_image_similarity_search_score(self, image_vs, image_uris):
+        results = image_vs.similarity_search_with_score(image_uri=image_uris[0], k=1)
+        assert len(results) == 1
+        assert results[0][0].metadata["image_uri"] == image_uris[0]
         assert results[0][1] == 0
 
     def test_similarity_search_by_vector(self, vs_custom):
@@ -253,6 +340,13 @@ class TestVectorStoreSearch:
         assert results[0] == Document(page_content="foo")
         results = vs_custom.similarity_search_with_score_by_vector(embedding)
         assert results[0][0] == Document(page_content="foo")
+        assert results[0][1] == 0
+
+    async def test_image_similarity_search_by_vector(self, image_vs, image_uris):
+        embedding = image_embedding_service.embed_image([image_uris[0]])
+        results = image_vs.similarity_search_by_vector(embedding)
+        assert len(results) == 3
+        assert results[0][0].metadata["image_uri"] == image_uris[0]
         assert results[0][1] == 0
 
     def test_max_marginal_relevance_search(self, vs_custom):
