@@ -106,7 +106,7 @@ class TestVectorStoreSearch:
         yield vs
         await engine._aexecute(f"DROP TABLE IF EXISTS {DEFAULT_TABLE}")
         await engine._engine.dispose()
-    
+
     @pytest_asyncio.fixture(scope="class")
     async def image_vs(self, engine, image_uris):
         await engine.ainit_vectorstore_table(
@@ -282,13 +282,9 @@ class TestVectorStoreSearch:
         )
         assert results[0] == Document(page_content="boo")
 
-    async def test_image_amax_marginal_relevance_search(self, image_vs, image_uri=):
-        results = await vs.amax_marginal_relevance_search(image_uri=)
-        assert results[0] == Document(page_content="bar")
-        results = await vs.amax_marginal_relevance_search(
-            query="bar", image_uri=None, filter="content = 'boo'"
-        )
-        assert results[0] == Document(page_content="boo")
+    async def test_image_amax_marginal_relevance_search(self, image_vs, image_uris):
+        results = await image_vs.amax_marginal_relevance_search(image_uris[1])
+        assert results[0].metadata["image_uri"] == image_uris[1]
 
     async def test_amax_marginal_relevance_search_vector(self, vs):
         embedding = embeddings_service.embed_query("bar")
