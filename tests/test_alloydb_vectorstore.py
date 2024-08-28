@@ -14,6 +14,7 @@
 
 import os
 import uuid
+from typing import List
 
 import numpy as np
 import pytest
@@ -52,7 +53,7 @@ def get_env_var(key: str, desc: str) -> str:
 
 class FakeImageEmbedding(DeterministicFakeEmbedding):
 
-    def embed_image(self, image_paths: list[str]):
+    def embed_image(self, image_paths: List[str]):
         return [self.embed_query(path) for path in image_paths]
 
 

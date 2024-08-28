@@ -14,8 +14,8 @@
 
 import os
 import uuid
+from typing import List
 
-import numpy as np
 import pytest
 import pytest_asyncio
 from langchain_core.documents import Document
@@ -53,7 +53,7 @@ def get_env_var(key: str, desc: str) -> str:
 
 class FakeImageEmbedding(DeterministicFakeEmbedding):
 
-    def embed_image(self, image_paths):
+    def embed_image(self, image_paths: List[str]):
         return [self.embed_query(path) for path in image_paths]
 
 

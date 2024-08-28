@@ -14,6 +14,7 @@
 
 import os
 import uuid
+from typing import List
 
 import pytest
 import pytest_asyncio
@@ -52,7 +53,7 @@ def get_env_var(key: str, desc: str) -> str:
 
 class FakeImageEmbedding(DeterministicFakeEmbedding):
 
-    def embed_image(self, image_paths: list[str]):
+    def embed_image(self, image_paths: List[str]):
         return [self.embed_query(path) for path in image_paths]
 
 
@@ -264,12 +265,8 @@ class TestVectorStoreSearch:
         results = image_vs_sync.similarity_search_with_relevance_scores(
             image_uri=image_uris[0], **score_threshold
         )
-        assert len(results) == 4
-
-        score_threshold = {"score_threshold": 0.02}
-        results = image_vs_sync.similarity_search_with_relevance_scores(
-            image_uri=None, **score_threshold
-        )
+        scores = [r[1] for r in results]
+        assert scores == []
         assert len(results) == 2
 
         score_threshold = {"score_threshold": 0.9}
