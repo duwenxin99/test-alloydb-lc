@@ -261,19 +261,19 @@ class TestVectorStoreSearch:
         self, image_vs_sync, image_uris
     ):
         score_threshold = {"score_threshold": 0}
-        results = image_vs_sync.asimilarity_search_with_relevance_scores(
+        results = image_vs_sync.similarity_search_with_relevance_scores(
             image_uri=image_uris[0], **score_threshold
         )
         assert len(results) == 4
 
         score_threshold = {"score_threshold": 0.02}
-        results = image_vs_sync.asimilarity_search_with_relevance_scores(
+        results = image_vs_sync.similarity_search_with_relevance_scores(
             image_uri=None, **score_threshold
         )
         assert len(results) == 2
 
         score_threshold = {"score_threshold": 0.9}
-        results = image_vs_sync.asimilarity_search_with_relevance_scores(
+        results = image_vs_sync.similarity_search_with_relevance_scores(
             image_uri=None, **score_threshold
         )
         assert len(results) == 1
