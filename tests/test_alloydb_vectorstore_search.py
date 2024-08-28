@@ -261,19 +261,19 @@ class TestVectorStoreSearch:
         self, image_vs_sync, image_uris
     ):
         score_threshold = {"score_threshold": 0}
-        results = await image_vs_sync.asimilarity_search_with_relevance_scores(
+        results = image_vs_sync.asimilarity_search_with_relevance_scores(
             image_uri=image_uris[0], **score_threshold
         )
         assert len(results) == 4
 
         score_threshold = {"score_threshold": 0.02}
-        results = await image_vs_sync.asimilarity_search_with_relevance_scores(
+        results = image_vs_sync.asimilarity_search_with_relevance_scores(
             image_uri=None, **score_threshold
         )
         assert len(results) == 2
 
         score_threshold = {"score_threshold": 0.9}
-        results = await image_vs_sync.asimilarity_search_with_relevance_scores(
+        results = image_vs_sync.asimilarity_search_with_relevance_scores(
             image_uri=None, **score_threshold
         )
         assert len(results) == 1
@@ -368,6 +368,8 @@ class TestVectorStoreSearch:
         embedding = image_embedding_service.embed_image([image_uris[0]])[0]
         results = image_vs_sync.similarity_search_by_vector(embedding)
         assert len(results) == 3
+        assert results[0].metadata["image_uri"] == image_uris[0]
+        results = image_vs_sync.similarity_search_with_score_by_vector(embedding)
         assert results[0][0].metadata["image_uri"] == image_uris[0]
         assert results[0][1] == 0
 
