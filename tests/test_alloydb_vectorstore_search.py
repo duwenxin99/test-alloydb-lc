@@ -265,9 +265,7 @@ class TestVectorStoreSearch:
         results = image_vs_sync.similarity_search_with_relevance_scores(
             image_uri=image_uris[0], **score_threshold
         )
-        scores = [r[1] for r in results]
-        assert scores == []
-        assert len(results) == 2
+        assert len(results) == 3
 
         score_threshold = {"score_threshold": 0.9}
         results = image_vs_sync.similarity_search_with_relevance_scores(
@@ -337,6 +335,8 @@ class TestVectorStoreSearch:
         results = image_vs_sync.similarity_search(image_uri=image_uris[0], k=1)
         assert len(results) == 1
         assert results[0].metadata["image_uri"] == image_uris[0]
+        results = image_vs_sync.similarity_search(image_uri=image_uris[0])
+        assert len(results) == 3
 
     def test_similarity_search_score(self, vs_custom):
         results = vs_custom.similarity_search_with_score("foo")
