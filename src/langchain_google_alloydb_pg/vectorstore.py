@@ -1347,7 +1347,7 @@ def cosine_similarity(X: Matrix, Y: Matrix) -> np.ndarray:
             f"Number of columns in X and Y must be the same. X has shape {X.shape} "
             f"and Y has shape {Y.shape}."
         )
-    try:
+    try:  # pragma: no cover
         import simsimd as simd  # type: ignore
 
         X = np.array(X, dtype=np.float32)
