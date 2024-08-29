@@ -32,11 +32,7 @@ from typing import (
 import aiohttp
 import google.auth  # type: ignore
 import google.auth.transport.requests  # type: ignore
-from google.cloud.alloydb.connector import (
-    AsyncConnector,
-    IPTypes,
-    RefreshStrategy,
-)
+from google.cloud.alloydb.connector import AsyncConnector, IPTypes, RefreshStrategy
 from sqlalchemy import MetaData, RowMapping, Table, text
 from sqlalchemy.engine import URL
 from sqlalchemy.exc import InvalidRequestError
@@ -75,9 +71,7 @@ async def _get_iam_principal_email(
         request = google.auth.transport.requests.Request()
         credentials.refresh(request)
     if hasattr(credentials, "_service_account_email"):
-        return credentials._service_account_email.replace(
-            ".gserviceaccount.com", ""
-        )
+        return credentials._service_account_email.replace(".gserviceaccount.com", "")
     # call OAuth2 api to get IAM principal email associated with OAuth2 token
     url = f"https://oauth2.googleapis.com/tokeninfo?access_token={credentials.token}"
     async with aiohttp.ClientSession() as client:
@@ -366,7 +360,7 @@ class AlloyDBEngine:
         url: Union[str | URL],
         **kwargs: Any,
     ) -> AlloyDBEngine:
-        """Create an PostgresEngine instance from arguments
+        """Create an AlloyDBEngine instance from arguments
 
         Args:
             url (Optional[str]): the URL used to connect to a database. Use url or set other arguments.
@@ -375,7 +369,7 @@ class AlloyDBEngine:
             ValueError: If not all database url arguments are specified
 
         Returns:
-            PostgresEngine
+            AlloyDBEngine
         """
         # Running a loop in a background thread allows us to support
         # async methods from non-async environments
@@ -393,9 +387,7 @@ class AlloyDBEngine:
             raise ValueError("Driver must be type 'postgresql+asyncpg'")
 
         engine = create_async_engine(url, **kwargs)
-        return cls(
-            cls.__create_key, engine, cls._default_loop, cls._default_thread
-        )
+        return cls(cls.__create_key, engine, cls._default_loop, cls._default_thread)
 
     async def _run_as_async(self, coro: Awaitable[T]) -> T:
         """Run an async coroutine asynchronously"""
@@ -432,7 +424,7 @@ class AlloyDBEngine:
         store_metadata: bool = True,
     ) -> None:
         """
-        Create a table for saving of vectors to be used with PostgresVectorStore.
+        Create a table for saving of vectors to be used with AlloyDBVectorStore.
 
         Args:
             table_name (str): The Postgres database table name.
@@ -491,7 +483,7 @@ class AlloyDBEngine:
         store_metadata: bool = True,
     ) -> None:
         """
-        Create a table for saving of vectors to be used with PostgresVectorStore.
+        Create a table for saving of vectors to be used with AlloyDBVectorStore.
 
         Args:
             table_name (str): The Postgres database table name.
@@ -537,7 +529,7 @@ class AlloyDBEngine:
         store_metadata: bool = True,
     ) -> None:
         """
-        Create a table for saving of vectors to be used with PostgresVectorStore.
+        Create a table for saving of vectors to be used with AlloyDBVectorStore.
 
         Args:
             table_name (str): The Postgres database table name.
@@ -718,9 +710,7 @@ class AlloyDBEngine:
             try:
                 await conn.run_sync(metadata.reflect, only=[table_name])
             except InvalidRequestError as e:
-                raise ValueError(
-                    f"Table, {table_name}, does not exist: " + str(e)
-                )
+                raise ValueError(f"Table, {table_name}, does not exist: " + str(e))
 
         table = Table(table_name, metadata)
         # Extract the schema information

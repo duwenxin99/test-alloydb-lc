@@ -15,36 +15,19 @@
 # TODO: Remove below import when minimum supported Python version is 3.10
 from __future__ import annotations
 
-import json
-import uuid
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, Callable, Iterable, List, Optional, Tuple, Type
 
-import numpy as np
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
-from sqlalchemy import RowMapping
 
 from .async_vectorstore import AsyncAlloyDBVectorStore
 from .engine import AlloyDBEngine
 from .indexes import (
     DEFAULT_DISTANCE_STRATEGY,
-    DEFAULT_INDEX_NAME_SUFFIX,
     BaseIndex,
     DistanceStrategy,
-    ExactNearestNeighbor,
     QueryOptions,
-    ScaNNIndex,
 )
 
 
@@ -53,14 +36,12 @@ class AlloyDBVectorStore(VectorStore):
 
     __create_key = object()
 
-    def __init__(
-        self, key: object, engine: AlloyDBEngine, vs: AsyncAlloyDBVectorStore
-    ):
+    def __init__(self, key: object, engine: AlloyDBEngine, vs: AsyncAlloyDBVectorStore):
         """AlloyDBVectorStore constructor.
         Args:
             key (object): Prevent direct constructor usage.
-            engine (PostgresEngine): Connection pool engine for managing connections to Postgres database.
-            vs (AsyncPostgresVectorstore): The async only VectorStore implementation
+            engine (AlloyDBEngine): Connection pool engine for managing connections to Postgres database.
+            vs (AsyncAlloyDBVectorstore): The async only VectorStore implementation
 
 
         Raises:
@@ -247,9 +228,7 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> Optional[bool]:
         """Delete records from the table."""
-        return await self._engine._run_as_async(
-            self.__vs.adelete(ids, **kwargs)
-        )
+        return await self._engine._run_as_async(self.__vs.adelete(ids, **kwargs))
 
     def delete(
         self,
@@ -574,9 +553,7 @@ class AlloyDBVectorStore(VectorStore):
     ) -> List[Document]:
         """Return docs selected by vector similarity search."""
         return await self._engine._run_as_async(
-            self.__vs.asimilarity_search_by_vector(
-                embedding, k, filter, **kwargs
-            )
+            self.__vs.asimilarity_search_by_vector(embedding, k, filter, **kwargs)
         )
 
     async def asimilarity_search_with_score_by_vector(
@@ -662,9 +639,7 @@ class AlloyDBVectorStore(VectorStore):
     ) -> List[Document]:
         """Return docs selected by vector similarity search."""
         return self._engine._run_as_sync(
-            self.__vs.asimilarity_search_by_vector(
-                embedding, k, filter, **kwargs
-            )
+            self.__vs.asimilarity_search_by_vector(embedding, k, filter, **kwargs)
         )
 
     def similarity_search_with_score_by_vector(
@@ -737,9 +712,7 @@ class AlloyDBVectorStore(VectorStore):
             self.__vs.set_maintenance_work_mem(num_leaves, vector_size)
         )
 
-    def set_maintenance_work_mem(
-        self, num_leaves: int, vector_size: int
-    ) -> None:
+    def set_maintenance_work_mem(self, num_leaves: int, vector_size: int) -> None:
         """Set database maintenance work memory (for ScaNN index creation)."""
         self._engine._run_as_sync(
             self.__vs.set_maintenance_work_mem(num_leaves, vector_size)
@@ -789,18 +762,14 @@ class AlloyDBVectorStore(VectorStore):
         index_name: Optional[str] = None,
     ) -> None:
         """Drop the vector index."""
-        return self._engine._run_as_sync(
-            self.__vs.adrop_vector_index(index_name)
-        )
+        return self._engine._run_as_sync(self.__vs.adrop_vector_index(index_name))
 
     async def ais_valid_index(
         self,
         index_name: Optional[str] = None,
     ) -> bool:
         """Check if index exists in the table."""
-        return await self._engine._run_as_async(
-            self.__vs.is_valid_index(index_name)
-        )
+        return await self._engine._run_as_async(self.__vs.is_valid_index(index_name))
 
     def is_valid_index(
         self,
