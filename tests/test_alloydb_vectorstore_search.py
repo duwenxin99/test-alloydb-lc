@@ -264,17 +264,17 @@ class TestVectorStoreSearch:
     ):
         score_threshold = {"score_threshold": 0.9}
         results = await image_vs.asimilarity_search_with_relevance_scores(
-            image_uri=None, **score_threshold
+            image_uri=image_uris[0], **score_threshold
         )
         assert len(results) == 1
         assert results[0][0].metadata["image_uri"] == image_uris[0]
 
-    def test_image_similarity_search_with_relevance_scores_threshold_cosine(
-        self, image_vs_sync, image_uris, engine_sync
+    async def test_image_similarity_search_with_relevance_scores_threshold_cosine(
+        self, image_vs_sync, image_uris
     ):
         score_threshold = {"score_threshold": 0.9}
         results = image_vs_sync.similarity_search_with_relevance_scores(
-            image_uri=None, **score_threshold
+            image_uri=image_uris[0], **score_threshold
         )
         assert len(results) == 1
         assert results[0][0].metadata["image_uri"] == image_uris[0]
