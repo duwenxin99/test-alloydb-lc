@@ -174,6 +174,7 @@ class TestVectorStoreSearch:
             engine,
             embedding_service=image_embedding_service,
             table_name=IMAGE_TABLE,
+            distance_strategy=DistanceStrategy.COSINE_DISTANCE,
         )
         ids = [str(uuid.uuid4()) for i in range(len(image_uris))]
         await vs.aadd_images(image_uris, ids=ids)
@@ -258,15 +259,19 @@ class TestVectorStoreSearch:
         assert len(results) == 1
         assert results[0][0] == Document(page_content="foo")
 
-    async def test_image_similarity_search_with_relevance_scores_threshold_cosine(
-        self, image_vs_sync, image_uris
+    async def test_image_asimilarity_search_with_relevance_scores_threshold_cosine(
+        self, image_vs, image_uris
     ):
-        score_threshold = {"score_threshold": 0}
-        results = image_vs_sync.similarity_search_with_relevance_scores(
-            image_uri=image_uris[0], **score_threshold
+        score_threshold = {"score_threshold": 0.9}
+        results = await image_vs.asimilarity_search_with_relevance_scores(
+            image_uri=None, **score_threshold
         )
-        assert len(results) == 3
+        assert len(results) == 1
+        assert results[0][0].metadata["image_uri"] == image_uris[0]
 
+    def test_image_similarity_search_with_relevance_scores_threshold_cosine(
+        self, image_vs_sync, image_uris, engine_sync
+    ):
         score_threshold = {"score_threshold": 0.9}
         results = image_vs_sync.similarity_search_with_relevance_scores(
             image_uri=None, **score_threshold
