@@ -357,7 +357,8 @@ class AlloyDBVectorStore(VectorStore):
     ) -> List[str]:
         """Embed images and add to the table."""
         encoded_images = []
-        metadatas = [{"image_uri": uri} for uri in images]
+        if metadatas is None:
+            metadatas = [{"image_uri": uri} for uri in images]
 
         for uri in images:
             encoded_image = self.encode_image(uri)
