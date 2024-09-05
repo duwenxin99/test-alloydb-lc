@@ -26,6 +26,7 @@ from langchain_google_alloydb_pg import AlloyDBChatMessageHistory, AlloyDBEngine
 
 project_id = os.environ["PROJECT_ID"]
 region = os.environ["REGION"]
+cluster_id = os.environ["CLUSTER_ID"]
 instance_id = os.environ["INSTANCE_ID"]
 db_name = os.environ["DATABASE_ID"]
 table_name = "message_store" + str(uuid.uuid4())
@@ -58,6 +59,7 @@ async def engine():
     engine = AlloyDBEngine.from_instance(
         project_id=project_id,
         region=region,
+        cluster=cluster_id,
         instance=instance_id,
         database=db_name,
     )
@@ -74,6 +76,7 @@ async def async_engine():
     async_engine = await AlloyDBEngine.afrom_instance(
         project_id=project_id,
         region=region,
+        cluster=cluster_id,
         instance=instance_id,
         database=db_name,
     )

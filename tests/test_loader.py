@@ -30,6 +30,7 @@ from langchain_google_alloydb_pg import (
 
 project_id = os.environ["PROJECT_ID"]
 region = os.environ["REGION"]
+cluster_id = os.environ["CLUSTER_ID"]
 instance_id = os.environ["INSTANCE_ID"]
 db_name = os.environ["DATABASE_ID"]
 table_name = "test-table" + str(uuid.uuid4())
@@ -54,6 +55,7 @@ class TestLoaderAsync:
         AlloyDBEngine._connector = None
         engine = await AlloyDBEngine.afrom_instance(
             project_id=project_id,
+            cluster=cluster_id,
             instance=instance_id,
             region=region,
             database=db_name,
@@ -65,6 +67,7 @@ class TestLoaderAsync:
         AlloyDBEngine._connector = None
         engine = AlloyDBEngine.from_instance(
             project_id=project_id,
+            cluster=cluster_id,
             instance=instance_id,
             region=region,
             database=db_name,
@@ -152,7 +155,9 @@ class TestLoaderAsync:
         finally:
             await self._cleanup_table(engine)
 
-    async def test_load_from_query_customized_content_customized_metadata(self, engine):
+    async def test_load_from_query_customized_content_customized_metadata(
+        self, engine
+    ):
         try:
             await self._cleanup_table(engine)
             query = f"""
@@ -208,7 +213,9 @@ class TestLoaderAsync:
         finally:
             await self._cleanup_table(engine)
 
-    async def test_load_from_query_customized_content_default_metadata(self, engine):
+    async def test_load_from_query_customized_content_default_metadata(
+        self, engine
+    ):
         try:
             await self._cleanup_table(engine)
             query = f"""
@@ -281,7 +288,9 @@ class TestLoaderAsync:
         finally:
             await self._cleanup_table(engine)
 
-    async def test_load_from_query_default_content_customized_metadata(self, engine):
+    async def test_load_from_query_default_content_customized_metadata(
+        self, engine
+    ):
         try:
             await self._cleanup_table(engine)
             query = f"""
@@ -442,7 +451,9 @@ class TestLoaderAsync:
 
             def my_formatter(row, content_columns):
                 return "-".join(
-                    str(row[column]) for column in content_columns if column in row
+                    str(row[column])
+                    for column in content_columns
+                    if column in row
                 )
 
             loader = await AlloyDBLoader.create(
@@ -543,14 +554,18 @@ class TestLoaderAsync:
             saver = await AlloyDBDocumentSaver.create(
                 engine=engine, table_name=table_name
             )
-            loader = await AlloyDBLoader.create(engine=engine, table_name=table_name)
+            loader = await AlloyDBLoader.create(
+                engine=engine, table_name=table_name
+            )
 
             await saver.aadd_documents(test_docs)
             docs = await self._collect_async_items(loader.alazy_load())
 
             assert docs == test_docs
             assert (
-                await engine._run_as_async(engine._aload_table_schema(table_name))
+                await engine._run_as_async(
+                    engine._aload_table_schema(table_name)
+                )
             ).columns.keys() == [
                 "page_content",
                 "langchain_metadata",
@@ -559,7 +574,9 @@ class TestLoaderAsync:
             await self._cleanup_table(engine)
 
     @pytest.mark.parametrize("store_metadata", [True, False])
-    async def test_save_doc_with_customized_metadata(self, engine, store_metadata):
+    async def test_save_doc_with_customized_metadata(
+        self, engine, store_metadata
+    ):
         await self._cleanup_table(engine)
         await engine.ainit_document_table(
             table_name,
@@ -579,7 +596,9 @@ class TestLoaderAsync:
                 },
             ),
         ]
-        saver = await AlloyDBDocumentSaver.create(engine=engine, table_name=table_name)
+        saver = await AlloyDBDocumentSaver.create(
+            engine=engine, table_name=table_name
+        )
         loader = await AlloyDBLoader.create(
             engine=engine,
             table_name=table_name,
@@ -595,7 +614,9 @@ class TestLoaderAsync:
         if store_metadata:
             docs == test_docs
             assert (
-                await engine._run_as_async(engine._aload_table_schema(table_name))
+                await engine._run_as_async(
+                    engine._aload_table_schema(table_name)
+                )
             ).columns.keys() == [
                 "page_content",
                 "fruit_name",
@@ -610,7 +631,9 @@ class TestLoaderAsync:
                 ),
             ]
             assert (
-                await engine._run_as_async(engine._aload_table_schema(table_name))
+                await engine._run_as_async(
+                    engine._aload_table_schema(table_name)
+                )
             ).columns.keys() == [
                 "page_content",
                 "fruit_name",
@@ -650,7 +673,9 @@ class TestLoaderAsync:
                 ),
             ]
             assert (
-                await engine._run_as_async(engine._aload_table_schema(table_name))
+                await engine._run_as_async(
+                    engine._aload_table_schema(table_name)
+                )
             ).columns.keys() == [
                 "page_content",
             ]
@@ -675,17 +700,23 @@ class TestLoaderAsync:
             saver = await AlloyDBDocumentSaver.create(
                 engine=engine, table_name=table_name
             )
-            loader = await AlloyDBLoader.create(engine=engine, table_name=table_name)
+            loader = await AlloyDBLoader.create(
+                engine=engine, table_name=table_name
+            )
 
             await saver.aadd_documents(test_docs)
             docs = await self._collect_async_items(loader.alazy_load())
             assert docs == test_docs
 
             await saver.adelete(docs[:1])
-            assert len(await self._collect_async_items(loader.alazy_load())) == 1
+            assert (
+                len(await self._collect_async_items(loader.alazy_load())) == 1
+            )
 
             await saver.adelete(docs)
-            assert len(await self._collect_async_items(loader.alazy_load())) == 0
+            assert (
+                len(await self._collect_async_items(loader.alazy_load())) == 0
+            )
         finally:
             await self._cleanup_table(engine)
 
@@ -744,11 +775,15 @@ class TestLoaderAsync:
             assert len(docs) == 1
 
             await saver.adelete(docs)
-            assert len(await self._collect_async_items(loader.alazy_load())) == 0
+            assert (
+                len(await self._collect_async_items(loader.alazy_load())) == 0
+            )
         finally:
             await self._cleanup_table(engine)
 
-    @pytest.mark.parametrize("metadata_json_column", [None, "metadata_col_test"])
+    @pytest.mark.parametrize(
+        "metadata_json_column", [None, "metadata_col_test"]
+    )
     async def test_delete_doc_with_customized_metadata(
         self, engine, metadata_json_column
     ):
@@ -809,6 +844,7 @@ class TestLoaderAsync:
         AlloyDBEngine._connector = None
         engine = AlloyDBEngine.from_instance(
             project_id=project_id,
+            cluster=cluster_id,
             instance=instance_id,
             region=region,
             database=db_name,

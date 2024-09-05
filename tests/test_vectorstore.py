@@ -27,7 +27,11 @@ from sqlalchemy import text
 from sqlalchemy.engine.row import RowMapping
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from langchain_google_alloydb_pg import AlloyDBEngine, AlloyDBVectorStore, Column
+from langchain_google_alloydb_pg import (
+    AlloyDBEngine,
+    AlloyDBVectorStore,
+    Column,
+)
 
 DEFAULT_TABLE = "test_table" + str(uuid.uuid4())
 DEFAULT_TABLE_SYNC = "test_table_sync" + str(uuid.uuid4())
@@ -38,12 +42,17 @@ embeddings_service = DeterministicFakeEmbedding(size=VECTOR_SIZE)
 host = os.environ["IP_ADDRESS"]
 
 texts = ["foo", "bar", "baz"]
-metadatas = [{"page": str(i), "source": "google.com"} for i in range(len(texts))]
+metadatas = [
+    {"page": str(i), "source": "google.com"} for i in range(len(texts))
+]
 docs = [
-    Document(page_content=texts[i], metadata=metadatas[i]) for i in range(len(texts))
+    Document(page_content=texts[i], metadata=metadatas[i])
+    for i in range(len(texts))
 ]
 
-embeddings = [embeddings_service.embed_query(texts[i]) for i in range(len(texts))]
+embeddings = [
+    embeddings_service.embed_query(texts[i]) for i in range(len(texts))
+]
 
 
 def get_env_var(key: str, desc: str) -> str:
@@ -84,28 +93,35 @@ class TestVectorStore:
 
     @pytest.fixture(scope="module")
     def db_region(self) -> str:
-        return get_env_var("REGION", "region for cloud sql instance")
+        return get_env_var("REGION", "region for AlloyDB instance")
+
+    @pytest.fixture(scope="module")
+    def db_cluster(self) -> str:
+        return get_env_var("CLUSTER_ID", "cluster for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_instance(self) -> str:
-        return get_env_var("INSTANCE_ID", "instance for cloud sql")
+        return get_env_var("INSTANCE_ID", "instance for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_name(self) -> str:
-        return get_env_var("DATABASE_ID", "database name on cloud sql instance")
+        return get_env_var("DATABASE_ID", "database name on AlloyDB instance")
 
     @pytest.fixture(scope="module")
     def user(self) -> str:
-        return get_env_var("DB_USER", "database user for cloud sql")
+        return get_env_var("DB_USER", "database user for AlloyDB")
 
     @pytest.fixture(scope="module")
     def password(self) -> str:
-        return get_env_var("DB_PASSWORD", "database password for cloud sql")
+        return get_env_var("DB_PASSWORD", "database password for AlloyDB")
 
     @pytest_asyncio.fixture(scope="class")
-    async def engine(self, db_project, db_region, db_instance, db_name):
+    async def engine(
+        self, db_project, db_region, db_cluster, db_instance, db_name
+    ):
         engine = await AlloyDBEngine.afrom_instance(
             project_id=db_project,
+            cluster=db_cluster,
             instance=db_instance,
             region=db_region,
             database=db_name,
@@ -126,16 +142,21 @@ class TestVectorStore:
         yield vs
 
     @pytest_asyncio.fixture(scope="class")
-    async def engine_sync(self, db_project, db_region, db_instance, db_name):
+    async def engine_sync(
+        self, db_project, db_region, db_cluster, db_instance, db_name
+    ):
         engine_sync = AlloyDBEngine.from_instance(
             project_id=db_project,
+            cluster=db_cluster,
             instance=db_instance,
             region=db_region,
             database=db_name,
         )
         yield engine_sync
 
-        await aexecute(engine_sync, f'DROP TABLE IF EXISTS "{DEFAULT_TABLE_SYNC}"')
+        await aexecute(
+            engine_sync, f'DROP TABLE IF EXISTS "{DEFAULT_TABLE_SYNC}"'
+        )
         await engine_sync.close()
 
     @pytest_asyncio.fixture(scope="class")
@@ -295,21 +316,27 @@ class TestVectorStore:
     async def test_add_docs(self, engine_sync, vs_sync):
         ids = [str(uuid.uuid4()) for i in range(len(texts))]
         vs_sync.add_documents(docs, ids=ids)
-        results = await afetch(engine_sync, f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"')
+        results = await afetch(
+            engine_sync, f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"'
+        )
         assert len(results) == 3
         vs_sync.delete(ids)
 
     async def test_add_texts(self, engine_sync, vs_sync):
         ids = [str(uuid.uuid4()) for i in range(len(texts))]
         vs_sync.add_texts(texts, ids=ids)
-        results = await afetch(engine_sync, f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"')
+        results = await afetch(
+            engine_sync, f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"'
+        )
         assert len(results) == 3
         await vs_sync.adelete(ids)
 
     async def test_cross_env(self, engine_sync, vs_sync):
         ids = [str(uuid.uuid4()) for i in range(len(texts))]
         await vs_sync.aadd_texts(texts, ids=ids)
-        results = await afetch(engine_sync, f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"')
+        results = await afetch(
+            engine_sync, f'SELECT * FROM "{DEFAULT_TABLE_SYNC}"'
+        )
         assert len(results) == 3
         await vs_sync.adelete(ids)
 

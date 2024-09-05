@@ -24,7 +24,9 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 from sqlalchemy import text
 
 from langchain_google_alloydb_pg import AlloyDBEngine
-from langchain_google_alloydb_pg.async_vectorstore import AsyncAlloyDBVectorStore
+from langchain_google_alloydb_pg.async_vectorstore import (
+    AsyncAlloyDBVectorStore,
+)
 from langchain_google_alloydb_pg.indexes import (
     DEFAULT_INDEX_NAME_SUFFIX,
     DistanceStrategy,
@@ -41,9 +43,12 @@ embeddings_service = DeterministicFakeEmbedding(size=VECTOR_SIZE)
 
 texts = ["foo", "bar", "baz"]
 ids = [str(uuid.uuid4()) for i in range(len(texts))]
-metadatas = [{"page": str(i), "source": "google.com"} for i in range(len(texts))]
+metadatas = [
+    {"page": str(i), "source": "google.com"} for i in range(len(texts))
+]
 docs = [
-    Document(page_content=texts[i], metadata=metadatas[i]) for i in range(len(texts))
+    Document(page_content=texts[i], metadata=metadatas[i])
+    for i in range(len(texts))
 ]
 
 embeddings = [embeddings_service.embed_query("foo") for i in range(len(texts))]
@@ -70,21 +75,28 @@ class TestIndex:
 
     @pytest.fixture(scope="module")
     def db_region(self) -> str:
-        return get_env_var("REGION", "region for cloud sql instance")
+        return get_env_var("REGION", "region for AlloyDB instance")
+
+    @pytest.fixture(scope="module")
+    def db_cluster(self) -> str:
+        return get_env_var("CLUSTER_ID", "cluster for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_instance(self) -> str:
-        return get_env_var("INSTANCE_ID", "instance for cloud sql")
+        return get_env_var("INSTANCE_ID", "instance for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_name(self) -> str:
-        return get_env_var("DATABASE_ID", "instance for cloud sql")
+        return get_env_var("DATABASE_ID", "instance for AlloyDB")
 
     @pytest_asyncio.fixture(scope="class")
-    async def engine(self, db_project, db_region, db_instance, db_name):
+    async def engine(
+        self, db_project, db_region, db_cluster, db_instance, db_name
+    ):
         engine = await AlloyDBEngine.afrom_instance(
             project_id=db_project,
             instance=db_instance,
+            cluster=db_cluster,
             region=db_region,
             database=db_name,
         )
@@ -105,13 +117,11 @@ class TestIndex:
         await vs.adrop_vector_index()
         yield vs
 
-    @pytest.mark.run(order=1)
     async def test_aapply_vector_index(self, vs):
         index = HNSWIndex()
         await vs.aapply_vector_index(index)
         assert await vs.is_valid_index(DEFAULT_INDEX_NAME)
 
-    @pytest.mark.run(order=2)
     async def test_areindex(self, vs):
         if not await vs.is_valid_index(DEFAULT_INDEX_NAME):
             index = HNSWIndex()
@@ -120,7 +130,6 @@ class TestIndex:
         await vs.areindex(DEFAULT_INDEX_NAME)
         assert await vs.is_valid_index(DEFAULT_INDEX_NAME)
 
-    @pytest.mark.run(order=3)
     async def test_dropindex(self, vs):
         await vs.adrop_vector_index()
         result = await vs.is_valid_index(DEFAULT_INDEX_NAME)

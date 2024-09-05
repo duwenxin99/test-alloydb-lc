@@ -24,7 +24,11 @@ from sqlalchemy import VARCHAR, text
 from sqlalchemy.engine.row import RowMapping
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from langchain_google_alloydb_pg import AlloyDBEngine, AlloyDBVectorStore, Column
+from langchain_google_alloydb_pg import (
+    AlloyDBEngine,
+    AlloyDBVectorStore,
+    Column,
+)
 
 DEFAULT_TABLE = "test_table" + str(uuid.uuid4()).replace("-", "_")
 DEFAULT_TABLE_SYNC = "test_table_sync" + str(uuid.uuid4()).replace("-", "_")
@@ -35,12 +39,17 @@ VECTOR_SIZE = 768
 embeddings_service = DeterministicFakeEmbedding(size=VECTOR_SIZE)
 
 texts = ["foo", "bar", "baz"]
-metadatas = [{"page": str(i), "source": "google.com"} for i in range(len(texts))]
+metadatas = [
+    {"page": str(i), "source": "google.com"} for i in range(len(texts))
+]
 docs = [
-    Document(page_content=texts[i], metadata=metadatas[i]) for i in range(len(texts))
+    Document(page_content=texts[i], metadata=metadatas[i])
+    for i in range(len(texts))
 ]
 
-embeddings = [embeddings_service.embed_query(texts[i]) for i in range(len(texts))]
+embeddings = [
+    embeddings_service.embed_query(texts[i]) for i in range(len(texts))
+]
 
 
 def get_env_var(key: str, desc: str) -> str:
@@ -81,20 +90,27 @@ class TestVectorStoreFromMethods:
 
     @pytest.fixture(scope="module")
     def db_region(self) -> str:
-        return get_env_var("REGION", "region for cloud sql instance")
+        return get_env_var("REGION", "region for AlloyDB instance")
+
+    @pytest.fixture(scope="module")
+    def db_cluster(self) -> str:
+        return get_env_var("CLUSTER_ID", "cluster for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_instance(self) -> str:
-        return get_env_var("INSTANCE_ID", "instance for cloud sql")
+        return get_env_var("INSTANCE_ID", "instance for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_name(self) -> str:
-        return get_env_var("DATABASE_ID", "database name on cloud sql instance")
+        return get_env_var("DATABASE_ID", "database name on AlloyDB instance")
 
     @pytest_asyncio.fixture
-    async def engine(self, db_project, db_region, db_instance, db_name):
+    async def engine(
+        self, db_project, db_region, db_cluster, db_instance, db_name
+    ):
         engine = await AlloyDBEngine.afrom_instance(
             project_id=db_project,
+            cluster=db_cluster,
             instance=db_instance,
             region=db_region,
             database=db_name,
@@ -115,9 +131,12 @@ class TestVectorStoreFromMethods:
         await engine.close()
 
     @pytest_asyncio.fixture
-    async def engine_sync(self, db_project, db_region, db_instance, db_name):
+    async def engine_sync(
+        self, db_project, db_region, db_cluster, db_instance, db_name
+    ):
         engine = AlloyDBEngine.from_instance(
             project_id=db_project,
+            cluster=db_cluster,
             instance=db_instance,
             region=db_region,
             database=db_name,
@@ -152,7 +171,9 @@ class TestVectorStoreFromMethods:
             metadatas=metadatas,
             ids=ids,
         )
-        results = await afetch(engine_sync, f"SELECT * FROM {DEFAULT_TABLE_SYNC}")
+        results = await afetch(
+            engine_sync, f"SELECT * FROM {DEFAULT_TABLE_SYNC}"
+        )
         assert len(results) == 3
         await aexecute(engine_sync, f"TRUNCATE TABLE {DEFAULT_TABLE_SYNC}")
 
@@ -178,7 +199,9 @@ class TestVectorStoreFromMethods:
             DEFAULT_TABLE_SYNC,
             ids=ids,
         )
-        results = await afetch(engine_sync, f"SELECT * FROM {DEFAULT_TABLE_SYNC}")
+        results = await afetch(
+            engine_sync, f"SELECT * FROM {DEFAULT_TABLE_SYNC}"
+        )
         assert len(results) == 3
         await aexecute(engine_sync, f"TRUNCATE TABLE {DEFAULT_TABLE_SYNC}")
 
@@ -191,7 +214,9 @@ class TestVectorStoreFromMethods:
             DEFAULT_TABLE_SYNC,
             ids=ids,
         )
-        results = await afetch(engine_sync, f"SELECT * FROM {DEFAULT_TABLE_SYNC}")
+        results = await afetch(
+            engine_sync, f"SELECT * FROM {DEFAULT_TABLE_SYNC}"
+        )
         assert len(results) == 3
         await aexecute(engine_sync, f"TRUNCATE TABLE {DEFAULT_TABLE_SYNC}")
 

@@ -77,32 +77,39 @@ class TestEngineAsync:
 
     @pytest.fixture(scope="module")
     def db_region(self) -> str:
-        return get_env_var("REGION", "region for cloud sql instance")
+        return get_env_var("REGION", "region for AlloyDB instance")
+
+    @pytest.fixture(scope="module")
+    def db_cluster(self) -> str:
+        return get_env_var("CLUSTER_ID", "cluster for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_instance(self) -> str:
-        return get_env_var("INSTANCE_ID", "instance for cloud sql")
+        return get_env_var("INSTANCE_ID", "instance for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_name(self) -> str:
-        return get_env_var("DATABASE_ID", "instance for cloud sql")
+        return get_env_var("DATABASE_ID", "instance for AlloyDB")
 
     @pytest.fixture(scope="module")
     def user(self) -> str:
-        return get_env_var("DB_USER", "database user for cloud sql")
+        return get_env_var("DB_USER", "database user for AlloyDB")
 
     @pytest.fixture(scope="module")
     def password(self) -> str:
-        return get_env_var("DB_PASSWORD", "database password for cloud sql")
+        return get_env_var("DB_PASSWORD", "database password for AlloyDB")
 
     @pytest.fixture(scope="module")
     def iam_account(self) -> str:
         return get_env_var("IAM_ACCOUNT", "Cloud SQL IAM account email")
 
     @pytest_asyncio.fixture(scope="class")
-    async def engine(self, db_project, db_region, db_instance, db_name):
+    async def engine(
+        self, db_project, db_region, db_cluster, db_instance, db_name
+    ):
         engine = await AlloyDBEngine.afrom_instance(
             project_id=db_project,
+            cluster=db_cluster,
             instance=db_instance,
             region=db_region,
             database=db_name,
@@ -147,6 +154,7 @@ class TestEngineAsync:
         self,
         db_project,
         db_region,
+        db_cluster,
         db_instance,
         db_name,
         user,
@@ -157,6 +165,7 @@ class TestEngineAsync:
             project_id=db_project,
             instance=db_instance,
             region=db_region,
+            cluster=db_cluster,
             database=db_name,
             user=user,
             password=password,
@@ -214,7 +223,9 @@ class TestEngineAsync:
         engine.close()
 
         engine = AlloyDBEngine.from_engine_args(
-            URL.create("postgresql+asyncpg", user, password, host, port, db_name)
+            URL.create(
+                "postgresql+asyncpg", user, password, host, port, db_name
+            )
         )
         await aexecute(engine, "SELECT 1")
         engine.close()
@@ -235,7 +246,9 @@ class TestEngineAsync:
             )
         with pytest.raises(ValueError):
             AlloyDBEngine.from_engine_args(
-                URL.create("postgresql+pg8000", user, password, host, port, db_name)
+                URL.create(
+                    "postgresql+pg8000", user, password, host, port, db_name
+                )
             )
 
     async def test_column(self, engine):
@@ -247,6 +260,7 @@ class TestEngineAsync:
     async def test_iam_account_override(
         self,
         db_project,
+        db_cluster,
         db_instance,
         db_region,
         db_name,
@@ -254,6 +268,7 @@ class TestEngineAsync:
     ):
         engine = await AlloyDBEngine.afrom_instance(
             project_id=db_project,
+            cluster=db_cluster,
             instance=db_instance,
             region=db_region,
             database=db_name,
@@ -272,33 +287,40 @@ class TestEngineSync:
 
     @pytest.fixture(scope="module")
     def db_region(self) -> str:
-        return get_env_var("REGION", "region for cloud sql instance")
+        return get_env_var("REGION", "region for AlloyDB instance")
+
+    @pytest.fixture(scope="module")
+    def db_cluster(self) -> str:
+        return get_env_var("CLUSTER_ID", "cluster for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_instance(self) -> str:
-        return get_env_var("INSTANCE_ID", "instance for cloud sql")
+        return get_env_var("INSTANCE_ID", "instance for AlloyDB")
 
     @pytest.fixture(scope="module")
     def db_name(self) -> str:
-        return get_env_var("DATABASE_ID", "instance for cloud sql")
+        return get_env_var("DATABASE_ID", "instance for AlloyDB")
 
     @pytest.fixture(scope="module")
     def user(self) -> str:
-        return get_env_var("DB_USER", "database user for cloud sql")
+        return get_env_var("DB_USER", "database user for AlloyDB")
 
     @pytest.fixture(scope="module")
     def password(self) -> str:
-        return get_env_var("DB_PASSWORD", "database password for cloud sql")
+        return get_env_var("DB_PASSWORD", "database password for AlloyDB")
 
     @pytest.fixture(scope="module")
     def iam_account(self) -> str:
         return get_env_var("IAM_ACCOUNT", "Cloud SQL IAM account email")
 
     @pytest_asyncio.fixture(scope="class")
-    async def engine(self, db_project, db_region, db_instance, db_name):
+    async def engine(
+        self, db_project, db_region, db_cluster, db_instance, db_name
+    ):
         engine = AlloyDBEngine.from_instance(
             project_id=db_project,
             instance=db_instance,
+            cluster=db_cluster,
             region=db_region,
             database=db_name,
         )
@@ -342,6 +364,7 @@ class TestEngineSync:
         self,
         db_project,
         db_region,
+        db_cluster,
         db_instance,
         db_name,
         user,
@@ -352,6 +375,7 @@ class TestEngineSync:
             project_id=db_project,
             instance=db_instance,
             region=db_region,
+            cluster=db_cluster,
             database=db_name,
             user=user,
             password=password,
@@ -372,6 +396,7 @@ class TestEngineSync:
     async def test_iam_account_override(
         self,
         db_project,
+        db_cluster,
         db_instance,
         db_region,
         db_name,
@@ -379,6 +404,7 @@ class TestEngineSync:
     ):
         engine = AlloyDBEngine.from_instance(
             project_id=db_project,
+            cluster=db_cluster,
             instance=db_instance,
             region=db_region,
             database=db_name,
