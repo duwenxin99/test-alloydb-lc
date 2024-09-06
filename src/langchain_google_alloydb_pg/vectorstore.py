@@ -19,7 +19,17 @@ import base64
 import json
 import uuid
 import warnings
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 import numpy as np
 from langchain_core.documents import Document
@@ -156,21 +166,27 @@ class AlloyDBVectorStore(VectorStore):
         if id_column not in columns:
             raise ValueError(f"Id column, {id_column}, does not exist.")
         if content_column not in columns:
-            raise ValueError(f"Content column, {content_column}, does not exist.")
+            raise ValueError(
+                f"Content column, {content_column}, does not exist."
+            )
         content_type = columns[content_column]
         if content_type != "text" and "char" not in content_type:
             raise ValueError(
                 f"Content column, {content_column}, is type, {content_type}. It must be a type of character string."
             )
         if embedding_column not in columns:
-            raise ValueError(f"Embedding column, {embedding_column}, does not exist.")
+            raise ValueError(
+                f"Embedding column, {embedding_column}, does not exist."
+            )
         if columns[embedding_column] != "USER-DEFINED":
             raise ValueError(
                 f"Embedding column, {embedding_column}, is not type Vector."
             )
 
         metadata_json_column = (
-            None if metadata_json_column not in columns else metadata_json_column
+            None
+            if metadata_json_column not in columns
+            else metadata_json_column
         )
 
         # If using metadata_columns check to make sure column exists
@@ -282,7 +298,9 @@ class AlloyDBVectorStore(VectorStore):
         if not metadatas:
             metadatas = [{} for _ in texts]
         # Insert embeddings
-        for id, content, embedding, metadata in zip(ids, texts, embeddings, metadatas):
+        for id, content, embedding, metadata in zip(
+            ids, texts, embeddings, metadatas
+        ):
             metadata_col_names = (
                 ", " + ", ".join(self.metadata_columns)
                 if len(self.metadata_columns) > 0
@@ -304,7 +322,9 @@ class AlloyDBVectorStore(VectorStore):
 
             # Add JSON column and/or close statement
             insert_stmt += (
-                f", {self.metadata_json_column})" if self.metadata_json_column else ")"
+                f", {self.metadata_json_column})"
+                if self.metadata_json_column
+                else ")"
             )
             if self.metadata_json_column:
                 values_stmt += ", :extra)"
@@ -340,7 +360,9 @@ class AlloyDBVectorStore(VectorStore):
         """Embed documents and add to the table."""
         texts = [doc.page_content for doc in documents]
         metadatas = [doc.metadata for doc in documents]
-        ids = await self.aadd_texts(texts, metadatas=metadatas, ids=ids, **kwargs)
+        ids = await self.aadd_texts(
+            texts, metadatas=metadatas, ids=ids, **kwargs
+        )
         return ids
 
     def encode_image(self, uri: str) -> str:
@@ -365,7 +387,9 @@ class AlloyDBVectorStore(VectorStore):
             encoded_images.append(encoded_image)
 
         if hasattr(self.embedding_service, "embed_image"):
-            embeddings = self.embedding_service.embed_image(images)
+            embeddings = []
+            for image in images:
+                embeddings.append(self.embedding_service.embed_image(image))
         else:
             raise ValueError(
                 "Please use an embedding model that supports image embedding."
@@ -395,7 +419,9 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[str]:
         """Embed documents and add to the table."""
-        return self.engine._run_as_sync(self.aadd_documents(documents, ids, **kwargs))
+        return self.engine._run_as_sync(
+            self.aadd_documents(documents, ids, **kwargs)
+        )
 
     def add_images(
         self,
@@ -581,7 +607,9 @@ class AlloyDBVectorStore(VectorStore):
             id_column,
             metadata_json_column,
         )
-        await vs.aadd_images(images=images, metadatas=metadatas, ids=ids, **kwargs)
+        await vs.aadd_images(
+            images=images, metadatas=metadatas, ids=ids, **kwargs
+        )
         return vs
 
     @classmethod
@@ -756,7 +784,9 @@ class AlloyDBVectorStore(VectorStore):
         filter = f"WHERE {filter}" if filter else ""
         stmt = f"SELECT *, {search_function}({self.embedding_column}, '{embedding}') as distance FROM \"{self.table_name}\" {filter} ORDER BY {self.embedding_column} {operator} '{embedding}' LIMIT {k};"
         if self.index_query_options:
-            query_options_stmt = f"SET LOCAL {self.index_query_options.to_string()};"
+            query_options_stmt = (
+                f"SET LOCAL {self.index_query_options.to_string()};"
+            )
             results = await self.engine._afetch_with_query_options(
                 stmt, query_options_stmt
             )
@@ -776,7 +806,7 @@ class AlloyDBVectorStore(VectorStore):
         elif query:
             embedding = self.embedding_service.embed_query(text=query)
         elif image_uri:
-            embedding = self.embedding_service.embed_image([image_uri])[0]
+            embedding = self.embedding_service.embed_image(image_uri)
         else:
             raise ValueError(
                 f"Specify `query` or `image_uri` to perform similarity search."
@@ -793,7 +823,9 @@ class AlloyDBVectorStore(VectorStore):
     ) -> List[Document]:
         """Return docs selected by similarity search on query."""
         return self.engine._run_as_sync(
-            self.asimilarity_search(query, image_uri, k=k, filter=filter, **kwargs)
+            self.asimilarity_search(
+                query, image_uri, k=k, filter=filter, **kwargs
+            )
         )
 
     async def asimilarity_search(
@@ -909,7 +941,9 @@ class AlloyDBVectorStore(VectorStore):
         docs_and_scores = await self.asimilarity_search_with_score(
             query=query, image_uri=image_uri, k=k, **kwargs
         )
-        return [(doc, relevance_score_fn(score)) for doc, score in docs_and_scores]
+        return [
+            (doc, relevance_score_fn(score)) for doc, score in docs_and_scores
+        ]
 
     def _similarity_search_with_relevance_scores(
         self,
@@ -937,7 +971,9 @@ class AlloyDBVectorStore(VectorStore):
         docs_and_scores = self.similarity_search_with_score(
             query=query, image_uri=image_uri, k=k, **kwargs
         )
-        return [(doc, relevance_score_fn(score)) for doc, score in docs_and_scores]
+        return [
+            (doc, relevance_score_fn(score)) for doc, score in docs_and_scores
+        ]
 
     def similarity_search_with_relevance_scores(
         self,
@@ -1010,8 +1046,10 @@ class AlloyDBVectorStore(VectorStore):
         """
         score_threshold = kwargs.pop("score_threshold", None)
 
-        docs_and_similarities = await self._asimilarity_search_with_relevance_scores(
-            query=query, image_uri=image_uri, k=k, **kwargs
+        docs_and_similarities = (
+            await self._asimilarity_search_with_relevance_scores(
+                query=query, image_uri=image_uri, k=k, **kwargs
+            )
         )
         if any(
             similarity < 0.0 or similarity > 1.0
@@ -1097,7 +1135,9 @@ class AlloyDBVectorStore(VectorStore):
         k = k if k else self.k
         fetch_k = fetch_k if fetch_k else self.fetch_k
         lambda_mult = lambda_mult if lambda_mult else self.lambda_mult
-        embedding_list = [json.loads(row[self.embedding_column]) for row in results]
+        embedding_list = [
+            json.loads(row[self.embedding_column]) for row in results
+        ]
         mmr_selected = maximal_marginal_relevance(
             np.array(embedding, dtype=np.float32),
             embedding_list,
@@ -1124,7 +1164,9 @@ class AlloyDBVectorStore(VectorStore):
                 )
             )
 
-        return [r for i, r in enumerate(documents_with_scores) if i in mmr_selected]
+        return [
+            r for i, r in enumerate(documents_with_scores) if i in mmr_selected
+        ]
 
     def similarity_search_with_score(
         self,
@@ -1148,7 +1190,9 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[Document]:
         """Return docs selected by vector similarity search."""
-        coro = self.asimilarity_search_by_vector(embedding, k, filter=filter, **kwargs)
+        coro = self.asimilarity_search_by_vector(
+            embedding, k, filter=filter, **kwargs
+        )
         return self.engine._run_as_sync(coro)
 
     def similarity_search_with_score_by_vector(
@@ -1226,7 +1270,9 @@ class AlloyDBVectorStore(VectorStore):
         )
         return self.engine._run_as_sync(coro)
 
-    async def set_maintenance_work_mem(self, num_leaves: int, vector_size: int) -> None:
+    async def set_maintenance_work_mem(
+        self, num_leaves: int, vector_size: int
+    ) -> None:
         """Set database maintenance work memory (for ScaNN index creation)."""
         # Required index memory in MB
         buffer = 1
@@ -1250,12 +1296,16 @@ class AlloyDBVectorStore(VectorStore):
 
         # Create `postgres_ann` extension when a `ScaNN` index is applied
         if isinstance(index, ScaNNIndex):
-            await self.engine._aexecute("CREATE EXTENSION IF NOT EXISTS postgres_ann")
+            await self.engine._aexecute(
+                "CREATE EXTENSION IF NOT EXISTS postgres_ann"
+            )
             function = index.distance_strategy.scann_index_function
         else:
             function = index.distance_strategy.index_function
 
-        filter = f"WHERE ({index.partial_indexes})" if index.partial_indexes else ""
+        filter = (
+            f"WHERE ({index.partial_indexes})" if index.partial_indexes else ""
+        )
         params = "WITH " + index.index_options()
         if name is None:
             if index.name == None:
