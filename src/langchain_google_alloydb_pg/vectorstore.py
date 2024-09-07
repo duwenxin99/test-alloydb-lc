@@ -315,6 +315,54 @@ class AlloyDBVectorStore(VectorStore):
 
         return ids
 
+    async def aupdate_embeddings(
+        self,
+        ids: List[str],
+        contents: Optional[List[str]] = None,
+        embeddings: Optional[List[List[float]]] = None,
+        model_name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> List[str]:
+        if contents is None:
+            contents = [None] * len(ids)
+        if embeddings is None:
+            embeddings = [None] * len(ids)
+        for id, embedding, content in zip(ids, embeddings, contents):
+            update_stmt = f'UPDATE "{self.table_name}" SET('
+            values = {"id": id}
+            # content_provided_flag = False
+            # if content is not None:
+            #     update_stmt += f"{self.content_column}=:content,"
+            #     values["content"] = content
+            #     content_provided_flag = True
+            if model_name is not None:
+                update_stmt += (
+                    f"{self.embedding_column}=embedding('{model_name}', content)"
+                )
+                # update_stmt += f"{self.embedding_column}=embedding({model_name}, {':' if content_provided_flag else ''}content),"
+                # values["model_name"] = model_name
+            else:
+                # Generate embeddings for the content
+                update_stmt += f"{self.embedding_column}=:embedding"
+                values["embedding"] = str(embedding)
+            update_stmt += f") WHERE {self.id_column}=:id"
+            print(f"\n\n####\n{update_stmt}\n####\n\n")
+            await self.engine._aexecute(update_stmt, values)
+
+        return ids
+
+    def update_embeddings(
+        self,
+        ids: List[str],
+        contents: Optional[List[str]] = None,
+        embeddings: Optional[List[List[float]]] = None,
+        model_name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> List[str]:
+        return self.engine._run_as_sync(
+            self.aupdate_embeddings(ids, contents, embeddings, model_name, **kwargs)
+        )
+
     async def aadd_texts(
         self,
         texts: Iterable[str],

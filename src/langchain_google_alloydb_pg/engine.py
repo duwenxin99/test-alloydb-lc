@@ -420,6 +420,91 @@ class AlloyDBEngine:
 
         await self._aexecute(query)
 
+    async def amigrate_vectorstore_table(
+        self,
+        table_name: str,
+        model_name: str,
+        vector_size: int,
+        content_column: str = "content",
+        embedding_column: str = "embedding",
+        overwrite_existing: bool = False,
+    ) -> None:
+        """
+        Add a vector column in existing table for saving vectors to be used with AlloyDB.
+        If column does not exist and overwrite flag is set, a UndefinedColumnError is thrown.
+        If column already exists and overwrite flag is not set, a DuplicateColumnError is thrown.
+
+        Args:
+            table_name (str): The table name.
+            model_name (str) : Name of the model to create vector embeddings.
+                Example: "textembedding-gecko@003".
+            vector_size (int): Vector size for the embedding model to be used.
+            content_column (str): Name of the column to store document content.
+                Default: "page_content".
+            embedding_column (str) : Name of the column to store vector embeddings.
+                Default: "embedding".
+            overwrite_existing (bool): Whether to drop the existing vector column before insertion.
+                Default: False.
+        Raises:
+            :class:`UndefinedColumnError <asyncpg.exceptions.UndefinedColumnError>`: if embedding_column does not exists.
+            :class:`DuplicateColumnError <asyncpg.exceptions.DuplicateColumnError>`: if embedding_column does already exists.
+        """
+        await self._aexecute("CREATE EXTENSION IF NOT EXISTS vector")
+        await self._aexecute("CREATE EXTENSION IF NOT EXISTS google_ml_integration")
+
+        if overwrite_existing:
+            await self._aexecute(
+                f'ALTER TABLE "{table_name}" DROP COLUMN "{embedding_column}";'
+            )
+
+        query = f"""ALTER TABLE "{table_name}"
+            ADD COLUMN "{embedding_column}" vector({vector_size});"""
+
+        await self._aexecute(query)
+
+        query = f"""UPDATE "{table_name}" SET "{embedding_column}" = embedding('{model_name}', "{content_column}");"""
+        await self._aexecute(query)
+
+    def migrate_vectorstore_table(
+        self,
+        table_name: str,
+        model_name: str,
+        vector_size: int,
+        content_column: str = "content",
+        embedding_column: str = "embedding",
+        overwrite_existing: bool = False,
+    ) -> None:
+        """
+        Add a vector column in existing table for saving vectors to be used with AlloyDB.
+        If column does not exist and overwrite flag is set, a UndefinedColumnError is thrown.
+        If column already exists and overwrite flag is not set, a DuplicateColumnError is thrown.
+
+        Args:
+            table_name (str): The table name.
+            model_name (str) : Name of the model to create vector embeddings.
+                Example: "textembedding-gecko@003".
+            vector_size (int): Vector size for the embedding model to be used.
+            content_column (str): Name of the column to store document content.
+                Default: "page_content".
+            embedding_column (str) : Name of the column to store vector embeddings.
+                Default: "embedding".
+            overwrite_existing (bool): Whether to drop the existing vector column before insertion.
+                Default: False.
+        Raises:
+            :class:`UndefinedColumnError <asyncpg.exceptions.UndefinedColumnError>`: if embedding_column does not exists.
+            :class:`DuplicateColumnError <asyncpg.exceptions.DuplicateColumnError>`: if embedding_column does already exists.
+        """
+        return self._run_as_sync(
+            self.amigrate_vectorstore_table(
+                table_name,
+                model_name,
+                vector_size,
+                content_column,
+                embedding_column,
+                overwrite_existing,
+            )
+        )
+
     def init_vectorstore_table(
         self,
         table_name: str,
