@@ -46,7 +46,7 @@ class AlloyDBVectorStore(VectorStore):
         self,
         key: object,
         engine: AlloyDBEngine,
-        embedding_service: Embeddings,
+        embedding_service: Optional[Embeddings],
         table_name: str,
         schema_name: str = "public",
         content_column: str = "content",
@@ -59,6 +59,7 @@ class AlloyDBVectorStore(VectorStore):
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
         index_query_options: Optional[QueryOptions] = None,
+        model_id: str = "",
     ):
         """AlloyDBVectorStore constructor.
         Args:
@@ -77,6 +78,7 @@ class AlloyDBVectorStore(VectorStore):
             fetch_k (int): Number of Documents to fetch to pass to MMR algorithm.
             lambda_mult (float): Number between 0 and 1 that determines the degree of diversity among the results with 0 corresponding to maximum diversity and 1 to minimum diversity. Defaults to 0.5.
             index_query_options (QueryOptions): Index query option.
+            model_id (str): Model Id to be used for Model Endpoint Management.
 
 
         Raises:
@@ -85,6 +87,10 @@ class AlloyDBVectorStore(VectorStore):
         if key != AlloyDBVectorStore.__create_key:
             raise Exception(
                 "Only create class through 'create' or 'create_sync' methods!"
+            )
+        if not embedding_service and not model_id:
+            raise Exception(
+                "Only one of 'embedding_service' or 'model_id' should be provided!"
             )
 
         self.engine = engine
@@ -101,12 +107,13 @@ class AlloyDBVectorStore(VectorStore):
         self.fetch_k = fetch_k
         self.lambda_mult = lambda_mult
         self.index_query_options = index_query_options
+        self.model_id = model_id
 
     @classmethod
     async def create(
         cls: Type[AlloyDBVectorStore],
         engine: AlloyDBEngine,
-        embedding_service: Embeddings,
+        embedding_service: Optional[Embeddings],
         table_name: str,
         schema_name: str = "public",
         content_column: str = "content",
@@ -120,6 +127,7 @@ class AlloyDBVectorStore(VectorStore):
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
         index_query_options: Optional[QueryOptions] = None,
+        model_id: str = "",
     ) -> AlloyDBVectorStore:
         """Create an AlloyDBVectorStore instance.
 
@@ -139,6 +147,7 @@ class AlloyDBVectorStore(VectorStore):
             fetch_k (int): Number of Documents to fetch to pass to MMR algorithm.
             lambda_mult (float): Number between 0 and 1 that determines the degree of diversity among the results with 0 corresponding to maximum diversity and 1 to minimum diversity. Defaults to 0.5.
             index_query_options (QueryOptions): Index query option.
+            model_id (str): Model Id to be used for Model Endpoint Management.
 
         Returns:
             AlloyDBVectorStore
@@ -207,13 +216,14 @@ class AlloyDBVectorStore(VectorStore):
             fetch_k,
             lambda_mult,
             index_query_options,
+            model_id,
         )
 
     @classmethod
     def create_sync(
         cls,
         engine: AlloyDBEngine,
-        embedding_service: Embeddings,
+        embedding_service: Optional[Embeddings],
         table_name: str,
         schema_name: str = "public",
         content_column: str = "content",
@@ -227,6 +237,7 @@ class AlloyDBVectorStore(VectorStore):
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
         index_query_options: Optional[QueryOptions] = None,
+        model_id: str = "",
     ) -> AlloyDBVectorStore:
         """Create an AlloyDBVectorStore instance.
 
@@ -247,6 +258,7 @@ class AlloyDBVectorStore(VectorStore):
             fetch_k (int, optional): Number of Documents to fetch to pass to MMR algorithm. Defaults to 20.
             lambda_mult (float, optional): Number between 0 and 1 that determines the degree of diversity among the results with 0 corresponding to maximum diversity and 1 to minimum diversity. Defaults to 0.5.
             index_query_options (Optional[QueryOptions], optional): Index query option. Defaults to None.
+            model_id (str): Model Id to be used for Model Endpoint Management.
 
         Returns:
             AlloyDBVectorStore
@@ -267,6 +279,7 @@ class AlloyDBVectorStore(VectorStore):
             fetch_k,
             lambda_mult,
             index_query_options,
+            model_id,
         )
         return engine._run_as_sync(coro)
 
@@ -297,6 +310,10 @@ class AlloyDBVectorStore(VectorStore):
             insert_stmt = f'INSERT INTO "{self.schema_name}"."{self.table_name}"({self.id_column}, {self.content_column}, {self.embedding_column}{metadata_col_names}'
             values = {"id": id, "content": content, "embedding": str(embedding)}
             values_stmt = "VALUES (:id, :content, :embedding"
+            if self.model_id:
+                values_stmt = (
+                    f"VALUES (:id, :content, embedding('{self.model_id}', :content)"
+                )
 
             # Add metadata
             extra = metadata
@@ -331,7 +348,11 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[str]:
         """Embed texts and add to the table."""
-        embeddings = self.embedding_service.embed_documents(list(texts))
+        embeddings = (
+            [[] for _ in list(texts)]
+            if self.model_id
+            else self.embedding_service.embed_documents(list(texts))
+        )
         ids = await self._aadd_embeddings(
             texts, embeddings, metadatas=metadatas, ids=ids, **kwargs
         )
@@ -619,9 +640,13 @@ class AlloyDBVectorStore(VectorStore):
         k = k if k else self.k
         operator = self.distance_strategy.operator
         search_function = self.distance_strategy.search_function
+        if self.model_id:
+            embedding = f"embedding('{self.model_id}', {self.content_column})"
+        else:
+            embedding = str(embedding)
 
         filter = f"WHERE {filter}" if filter else ""
-        stmt = f"SELECT *, {search_function}({self.embedding_column}, '{embedding}') as distance FROM \"{self.schema_name}\".\"{self.table_name}\" {filter} ORDER BY {self.embedding_column} {operator} '{embedding}' LIMIT {k};"
+        stmt = f'SELECT *, {search_function}({self.embedding_column}, {embedding}) as distance FROM "{self.schema_name}"."{self.table_name}" {filter} ORDER BY {self.embedding_column} {operator} {embedding} LIMIT {k};'
         if self.index_query_options:
             query_options_stmt = f"SET LOCAL {self.index_query_options.to_string()};"
             results = await self.engine._afetch_with_query_options(
@@ -651,7 +676,9 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[Document]:
         """Return docs selected by similarity search on query."""
-        embedding = self.embedding_service.embed_query(text=query)
+        embedding = (
+            [] if self.model_id else self.embedding_service.embed_query(text=query)
+        )
 
         return await self.asimilarity_search_by_vector(
             embedding=embedding, k=k, filter=filter, **kwargs
@@ -676,7 +703,9 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         """Return docs and distance scores selected by similarity search on query."""
-        embedding = self.embedding_service.embed_query(query)
+        embedding = (
+            [] if self.model_id else self.embedding_service.embed_query(text=query)
+        )
         docs = await self.asimilarity_search_with_score_by_vector(
             embedding=embedding, k=k, filter=filter, **kwargs
         )
@@ -739,7 +768,14 @@ class AlloyDBVectorStore(VectorStore):
         **kwargs: Any,
     ) -> List[Document]:
         """Return docs selected using the maximal marginal relevance."""
-        embedding = self.embedding_service.embed_query(text=query)
+        embedding = None
+        if self.model_id:
+            mem_embeddings = await self.engine._afetch(
+                f"SELECT embedding('{self.model_id}', '{query}')::vector as {self.embedding_column};"
+            )
+            embedding = json.loads(mem_embeddings[0][self.embedding_column])
+        else:
+            embedding = self.embedding_service.embed_query(text=query)
 
         return await self.amax_marginal_relevance_search_by_vector(
             embedding=embedding,
