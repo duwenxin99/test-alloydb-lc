@@ -317,50 +317,60 @@ class AlloyDBVectorStore(VectorStore):
 
     async def aupdate_embeddings(
         self,
-        ids: List[str],
-        contents: Optional[List[str]] = None,
-        embeddings: Optional[List[List[float]]] = None,
+        ids: Optional[List[str]] = None,
         model_name: Optional[str] = None,
         **kwargs: Any,
-    ) -> List[str]:
-        if contents is None:
-            contents = [None] * len(ids)
-        if embeddings is None:
-            embeddings = [None] * len(ids)
-        for id, embedding, content in zip(ids, embeddings, contents):
-            update_stmt = f'UPDATE "{self.table_name}" SET('
-            values = {"id": id}
-            # content_provided_flag = False
-            # if content is not None:
-            #     update_stmt += f"{self.content_column}=:content,"
-            #     values["content"] = content
-            #     content_provided_flag = True
-            if model_name is not None:
-                update_stmt += (
-                    f"{self.embedding_column}=embedding('{model_name}', content)"
-                )
-                # update_stmt += f"{self.embedding_column}=embedding({model_name}, {':' if content_provided_flag else ''}content),"
-                # values["model_name"] = model_name
-            else:
-                # Generate embeddings for the content
-                update_stmt += f"{self.embedding_column}=:embedding"
-                values["embedding"] = str(embedding)
-            update_stmt += f") WHERE {self.id_column}=:id"
-            print(f"\n\n####\n{update_stmt}\n####\n\n")
-            await self.engine._aexecute(update_stmt, values)
+    ) -> None:
+        whereClause = f" WHERE {self.id_column} IN ({', '.join(ids)})" if ids else ""
+        if model_name:
+            # using model endpoint management to update embeddings
+            update_stmt = f"""UPDATE "{self.table_name}" SET
+                {self.embedding_column}=embedding('{model_name}', {self.content_column})"""
+            await self.engine._aexecute(update_stmt + whereClause)
+        else:
+            # fetch contents
+            rows = []
+            stmt = f"SELECT {self.id_column}, {self.content_column}  FROM {self.table_name}"
+            rows = await self.engine._afetch(stmt + whereClause)
+            max_chars_in_batch = kwargs.get("max_chars_in_batch", 10000)
+            embeddings = []
+            # make batches of max_chars_in_batch
+            batch = []
+            batch_size = 0
+            for row in rows:
+                batch_size += len(row[self.content_column])
+                if batch_size <= max_chars_in_batch or len(batch) == 0:
+                    batch.append(row)
+                else:
+                    embeddings.extend(
+                        self.embedding_service.embed_documents(
+                            [r[self.content_column][:max_chars_in_batch] for r in batch]
+                        )
+                    )
+                    batch = [row]
+                    batch_size = len(row[self.content_column])
 
-        return ids
+            # update embeddings
+            # Note: can be split into batches
+            for row in rows:
+                update_stmt = (
+                    f'UPDATE "{self.table_name}" SET({self.embedding_column}=:embedding)'
+                    f"WHERE {self.id_column} = :id"
+                )
+                values = {
+                    "id": row[self.id_column],
+                    "embedding": str(row[self.embedding_column]),
+                }
+                await self.engine._aexecute(update_stmt, values)
 
     def update_embeddings(
         self,
-        ids: List[str],
-        contents: Optional[List[str]] = None,
-        embeddings: Optional[List[List[float]]] = None,
+        ids: Optional[List[str]] = None,
         model_name: Optional[str] = None,
         **kwargs: Any,
-    ) -> List[str]:
+    ) -> None:
         return self.engine._run_as_sync(
-            self.aupdate_embeddings(ids, contents, embeddings, model_name, **kwargs)
+            self.aupdate_embeddings(ids, model_name, **kwargs)
         )
 
     async def aadd_texts(
