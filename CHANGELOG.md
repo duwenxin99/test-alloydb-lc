@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/googleapis/langchain-google-alloydb-pg-python/compare/v0.8.0...v0.8.1) (2024-10-29)
+
+
+### Bug Fixes
+
+* **deps:** Update dependency pytest-cov to v6 ([#267](https://github.com/googleapis/langchain-google-alloydb-pg-python/issues/267)) ([1131b73](https://github.com/googleapis/langchain-google-alloydb-pg-python/commit/1131b7331f4d593cfad4b459d4b02758549ea33d))
+
 ## [0.8.0](https://github.com/googleapis/langchain-google-alloydb-pg-python/compare/v0.7.0...v0.8.0) (2024-10-23)
 
 
