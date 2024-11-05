@@ -120,6 +120,7 @@ jobs:
 
                     // Iterate through each check and find matching names
                     for (const check of checks.data.check_runs) {
+                      console.log(`Handling test name ${check.name}`);
                       for (const testName of testNameFound.keys()) {
                         if (testNameFound.get(testName) === true){
                           //skip if a check is already found for this name
