@@ -158,7 +158,7 @@ jobs:
                             `Cloud Build Failure Reporter found test failure for [**${check.name}** ](${check.html_url}) at [${commit.sha}](${commit.html_url}). Please fix the error and then close the issue after the **${check.name}** test passes.`
                         );
                     }
-                  }
+                  });
 
                   // no periodic checks found across all commits, report it
                   const noTestFound = Array.from(testNameFound.values()).every(value => value === false);
