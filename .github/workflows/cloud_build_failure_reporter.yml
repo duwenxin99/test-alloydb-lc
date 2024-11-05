@@ -126,7 +126,7 @@ jobs:
                           //skip if a check is already found for this name
                           continue; 
                         }
-                        if (check.name == testName) {
+                        if (check.name.includes(testName)) {
                           relevantChecks.set(check, commit);
                           testNameFound.set(testName, true);
                         }
@@ -140,7 +140,7 @@ jobs:
                   }
 
                   // Handle each relevant check
-                  relevantChecks.forEach((check, commit) => {
+                  relevantChecks.forEach((commit, check) => {
                     if (
                         check.status === 'completed' &&
                         check.conclusion === 'success'
