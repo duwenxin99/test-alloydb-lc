@@ -114,33 +114,6 @@ class AlloyDBEngine:
     _default_thread: Optional[Thread] = None
     __create_key = object()
 
-    def __init__(
-        self,
-        key: object,
-        pool: AsyncEngine,
-        loop: Optional[asyncio.AbstractEventLoop],
-        thread: Optional[Thread],
-    ) -> None:
-        """AlloyDBEngine constructor.
-
-        Args:
-            key (object): Prevent direct constructor usage.
-            engine (AsyncEngine): Async engine connection pool.
-            loop (Optional[asyncio.AbstractEventLoop]): Async event loop used to create the engine.
-            thread (Optional[Thread]): Thread used to create the engine async.
-
-        Raises:
-            Exception: If the constructor is called directly by the user.
-        """
-
-        if key != AlloyDBEngine.__create_key:
-            raise Exception(
-                "Only create class through 'create' or 'create_sync' methods!"
-            )
-        self._pool = pool
-        self._loop = loop
-        self._thread = thread
-
     @classmethod
     def __start_background_loop(
         cls,
