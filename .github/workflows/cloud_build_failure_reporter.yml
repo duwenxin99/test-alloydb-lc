@@ -21,6 +21,11 @@ on:
           required: true
           type: string
   workflow_dispatch:
+    inputs:
+      trigger_names:
+        description: 'Cloud Build trigger names separated by comma.'
+        required: true
+        default: ''
 
 jobs:
   report:
