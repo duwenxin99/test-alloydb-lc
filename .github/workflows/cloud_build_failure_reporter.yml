@@ -108,7 +108,7 @@ jobs:
                     ...context.repo
                   });
 
-                  const relevantChecks = [];
+                  const relevantChecks = new Map();
                   for (const commit of commits) {
                     console.log(
                       `checking runs at ${commit.html_url}: ${commit.commit.message}`
@@ -127,7 +127,7 @@ jobs:
                           continue; 
                         }
                         if (check.name == testName) {
-                          relevantChecks.push(check);
+                          relevantChecks.set(check, commit);
                           testNameFound.set(testName, true);
                         }
                       }
@@ -140,7 +140,7 @@ jobs:
                   }
 
                   // Handle each relevant check
-                  for (const check of relevantChecks) {
+                  relevantChecks.forEach((check, commit) => {
                     if (
                         check.status === 'completed' &&
                         check.conclusion === 'success'
